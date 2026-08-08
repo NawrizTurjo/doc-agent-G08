@@ -1,0 +1,867 @@
+HEADER
+======
+Member name: Abhishek Roy
+Student number: 2105033
+Sections led: Section 2 (Your Corpus), Section 3 (What the Data Shows), Section 5
+(Design Choices and Justification)
+
+
+FULL CONVERSATION
+=============================
+
+--- SECTION 2 START ---
+
+[USER]
+<uploaded A1_form_Shakespeare_RAG.docx>
+improved the docs a bit
+
+now i need to discuss with you about specific sections one by one. i have worked on
+section 2 , 3 and 5. we will discuss them one by one and will try to plan out the best
+decisions to move forward.
+
+starting with section 2
+
+[AI]
+Nice work on Section 2 — the corpus-identity correction in particular is a real,
+well-evidenced fix. Let me go through it point by point.
+
+The corpus correction — verified, and it's right. I pulled the actual Internet Archive
+page to double-check: publisher is confirmed as P.F. Collier (New York), publication
+date is unresolved ([19--]), and the catalog's Possible copyright status field literally
+says NOT_IN_COPYRIGHT — exactly what you cited. There's also a nice independent
+cross-check I hadn't noticed before: the archive lists Sir Henry Irving as a contributor
+to this item — which matches your toc.json's section 2, "Shakespeare and Bacon, by Sir
+Henry Irving." That's strong confirmation this is genuinely the right source item, not
+just a plausible-looking match. Good catch fixing the earlier "1904 Oxford Edition"
+guess — that was wrong, and it's on me for not verifying it earlier.
+
+This needs to propagate. README.md still says "1904 Oxford Edition" in several places
+(title, corpus section, files table). Since this form is now the source of truth, want
+me to sync the README to match once we're done going through all your sections? I'd
+rather batch that than fix it piecemeal.
+
+Two places where we can trade an estimate for a real number:
+- Size on disk — you wrote "rough estimate, 1–3 GB, to be confirmed." Since the Kaggle
+  dataset already exists, this is just checkable right now — the dataset page shows its
+  actual size. Worth pulling before submission rather than leaving it as a guess.
+- Word count — the "~884,000 words, widely cited" line is honest about being
+  unverified, but it's also exactly the kind of unsourced claim the course's grading
+  note warns about ("claims far above what the grader measures... flagged as possible
+  fabrication"). We actually have a better option sitting right here: 7 real
+  transcribed ground-truth pages. A rough extrapolation (words-per-page from those ×
+  total page count) would be a first-party estimate from our own data instead of an
+  uncited external number — weaker precision, but zero fabrication risk. Want me to
+  compute that from the ground truth we already have?
+
+One real inconsistency worth deciding now — the split plan. You wrote the test split
+holds out "one full work per category... plus a handful of complete sonnets (Poem)."
+But your own rule is split by whole document, never partial — and in toc.json,
+"Sonnets" is one single section (id 42, pages 1246–1269), not 154 individually-
+splittable works. Holding out "a handful" of sonnets from inside that one section is a
+partial-document split, which contradicts the rule you just stated above it. Two clean
+ways to fix it:
+1. Hold out the entire Sonnets section as your Poem-category test work, or
+2. Pick a smaller, genuinely standalone Poem-category work instead — A Lover's
+   Complaint (4 pages) or The Passionate Pilgrim (3 pages) — which sidesteps the issue
+   entirely since holding out one of those is unambiguously "one whole work."
+
+Which do you want? (Also, for what it's worth — I can already confirm Comedy of
+Errors, King John, and Othello are all valid, correctly-categorized titles in your
+toc.json, so those three don't need to stay "pending cross-check" — that part's locked.)
+
+Table 8 (preparation) I left untouched from before — nothing there needs revisiting
+unless you've got new information on binarization/contrast.
+
+[USER]
+before we start discussing here is the stuffs you will gonna do
+
+1. YOU WILL NOT UPDATE THE DOCS DIRECTLY
+2. YOU WILL CREATE A SEPERATE MD FILE, THAT WILL CONTAIN THE CHANGES WE WILL BE MAKING
+AND WE ARE GOING TO IMPROVE IT ONE BY ONE, STEP BY STEP, SECTION BY SECTION
+3. FROM NOW WE WILL DISCUSS EVERYTHING IN MORE SIMPLE WAY, EASILY UNDERSTADNBLE WAY FOR
+ME, SO THAT I CAN CONTRIBUTE ENOUGH FOR DECISION MAKING.
+
+understood??
+
+[AI]
+Understood — three rules, got it:
+1. I won't touch the docx.
+2. I'll keep a separate markdown file tracking every decision, section by section, as
+   we go.
+3. I'll keep things simple and plain so you can weigh in easily — no jargon walls.
+
+Let me set that tracker file up now.
+
+[created A1_form_changelog.md]
+
+That's saved. So for Section 2, here's what's actually left to decide — three small
+things:
+
+1. File size — I can just go check the real size of your Kaggle dataset instead of
+   guessing. Want me to do that?
+2. Word count — do you want me to estimate it from the 7 pages we've already
+   hand-transcribed (real, but rough), or leave the outside "~884,000 words" number
+   as-is (cited less solidly, but a bigger, more official-sounding number)?
+3. The Sonnets problem — this is the one that actually needs your judgment call. Pick
+   one:
+   (a) Hold out the whole Sonnets section as your test piece for Poems, or
+   (b) Swap it for a smaller poem that's already a complete standalone piece — A
+       Lover's Complaint or The Passionate Pilgrim.
+
+What do you want to do on these three?
+
+[USER]
+The "Licence, and may we share it" part -> can you describe what is written in the docs?
+
+[AI]
+Here's what's written in the docx for that part:
+
+It says the licence is public domain. The reasoning given is that Internet Archive's own
+rights-review field for this scan literally lists its status as "NOT_IN_COPYRIGHT", and
+there's no visible copyright notice on any page of the scan itself.
+
+It also flags a correction: it notes that an earlier, unverified guess had called this
+the "1904 Oxford Edition," and walks that back — the catalog record doesn't actually
+give an exact printing year, just "early 1900s," publisher P.F. Collier & Son, New
+York. So it's explicit that the exact year is unknown, not 1904 specifically.
+
+Then it adds a fallback point: even if the exact printing year were uncertain,
+Shakespeare himself died in 1616, so the underlying work is unambiguously public domain
+regardless — this edition just doesn't carry any additional rights restriction on top
+of that.
+
+Last line: since it's public domain, it says you're free to re-share it, and notes
+you're already doing that via the Kaggle dataset.
+
+[USER]
+if we dont have the exact year, we should not use it anywhere directly in the docs and
+rather mntion early 1900 from the whole docs, not only section 2 and also refrain from
+mentioning it in the "Licence, and may we share it" as we are filling the docs up, so
+we dont need to write it like we need some context before reading the form
+
+include it as a improvement
+
+[AI]
+Got it, logged. So going forward: no specific year anywhere in the docs — always
+"early 1900s" — and the Licence answer gets simplified to just state the fact cleanly,
+no backstory needed. This applies everywhere, not just Section 2.
+
+[logged as changelog item 1b]
+
+[USER]
+How big is it
+
+totally written as assumption, it should be more numerical.
+
+Total pages in the pdf are 1374
+Biographical introduction and shakespeare and bacon takes about 37 pages
+(bio_001-bio_037)
+the literary creation is in the page_0001.jpg -page_1322.jpg
+The pdf file size is 121 MB
+we generated scannable image from it , they are exactly 4.51GB
+about word count, averaging 800 word per page (rough assumption made after ocring few
+pages) with total about 1300 pages in the book worth writtings. so more than 1 million
+words in the book
+
+add them in the log
+
+[AI]
+Logged. So Section 2's numbers are now all real:
+- PDF pages: 1,374 total (37 front-matter/biography + the rest is the literary works,
+  page_0001–page_1322)
+- PDF file size: 121 MB
+- Our extracted image dataset: 4.51 GB (exact)
+- Word count: ~800 words/page × ~1,300 pages of actual writing ≈ 1,000,000+ words —
+  our own estimate, not someone else's number
+
+That just leaves one open item in Section 2: the Sonnets test-split decision (hold out
+the whole Sonnets section, or swap in a smaller standalone poem like A Lover's
+Complaint). Want to settle that now, or move on and come back to it?
+
+[USER]
+Scan & script difficulty
+
+Two structurally different layouts: single-column dense prose (Biographical
+Introduction) vs. mostly two-column justified play/verse text with running headers,
+page numbers, italicized speaker prefixes (e.g. 'Fal.', 'Host.'), and bracketed stage
+directions ('[Exit Simple.]'). Old-style typography (ae ligatures, archaic punctuation,
+occasional Latin block quotes) appears in the biographical section. Scans themselves are
+otherwise clean — no fading or skew observed on any page inspected so far.
+
+along with those
+
+i observed in some places among the single column dense prose we have smaller fonts
+quotes of different people/character
+
+tha start of a drama also contain introcudtion to the characters , we have a different
+structure there as well
+
+also add a instruction in the log to include them as list in the docs
+
+[AI]
+Both added, and I fixed a formatting glitch from my last edit while I was in there. So
+the log now has, for the Scan & script difficulty answer:
+- The existing two layouts (single-column prose vs. two-column plays)
+- New: smaller-font quoted speech tucked inside the prose sections
+- New: a distinct "character introduction" structure at the start of each play
+- Instruction: write the whole answer as a bullet list, one layout type per bullet,
+  instead of one paragraph
+
+Anything else to add here, or should we move on?
+
+[USER]
+How we split it (no leakage)
+train/val/test as percentages, split by DOCUMENT (never by page), so no book appears in
+two splits.
+
+what did it mean by split by document?
+
+[AI]
+"Split by document" means: when you divide your corpus into train/validation/test, you
+decide the split at the level of a whole work (a whole play, a whole poem, the whole
+Sonnets section) — not at the level of individual pages.
+
+So in practice for your corpus: you'd pick, say, Othello entirely for the test set —
+every single page of it, start to finish — rather than putting page 1171 in test and
+page 1172 in train.
+
+Why this matters (the leakage risk): if you split page-by-page instead, you could end up
+with, say, page 1171 of Othello in your training set and page 1172 of the same play in
+your test set. Since those two pages are about the same characters, same plot, same
+vocabulary, same writing style — your system would basically be tested on something it
+already partly saw. Your test score would look better than it really is, because the
+"unseen" test page isn't actually all that unseen — it's sitting right next to material
+the system trained on.
+
+Splitting by whole document avoids that: if Othello is entirely in the test set, the
+system genuinely never saw any of it during training — the test result actually
+reflects how well it generalizes to new material, not how well it memorized something
+adjacent to what it already had.
+
+That's also exactly why the Sonnets question we logged earlier matters — holding out "a
+handful of sonnets" from inside one document, instead of the whole document, is a small
+version of this same leak.
+
+[USER]
+ok fair but for the sonnets, they have different structure that other right? and we
+dont have many chapters for sonnet so i have to break it down a little right?
+
+also same goes for the biographical pages
+
+[AI]
+Fair question, and I think the answer's actually a bit different for each of those two.
+
+Biographical pages — you don't actually have a problem here. You have exactly 2
+separate works in that category: the Biographical Introduction (~30 pages) and the
+"Shakespeare and Bacon" essay (~7 pages). Those are already two separate whole
+documents. If you need a Biography test-holdout, you'd just hold out the whole smaller
+one (Shakespeare and Bacon) entirely — no rule-breaking needed, no partial split. So
+nothing to fix there.
+
+Sonnets is the real case, and here's the key difference: a play's scenes build on each
+other — Act 3 of Othello shares characters, plot, and running vocabulary with Act 1.
+That shared context is why splitting mid-play leaks information. A sonnet doesn't have
+that problem — each of the 154 sonnets is a fully self-contained 14-line poem. Sonnet 18
+doesn't depend on Sonnet 17 the way Act 2 depends on Act 1.
+
+So the honest fix isn't "break the rule" — it's "redefine what counts as one document
+for this section." For plays, one document = one play. For Sonnets, it's reasonable to
+say one document = one individual sonnet. You're still never splitting a document in
+half — you're just recognizing that the natural unit here is smaller than the whole
+154-sonnet collection.
+
+One thing worth being upfront about in the docs, though: since several sonnets can sit
+on the same scanned page, this only really holds up if your chunking (your
+semantic-chunking bonus feature) actually splits at sonnet boundaries rather than page
+boundaries — otherwise a single page-level chunk could still straddle a train sonnet and
+a test sonnet. Worth stating that connection explicitly rather than leaving it implicit.
+
+Want me to log this as the answer to the Sonnets question (option (a)/(b) from before,
+replaced with this "sonnet = document" approach instead)?
+
+[USER]
+we will use a 70-15-15 split
+
+and we will use the document style for the splits. but for sonnets and poems we will be
+taking care and spliting them in a way that it can learn without leakage, write the plan
+here first
+
+[AI]
+Written into the log. Here's the plan in plain terms:
+
+Split ratio: 70% train / 15% validation / 15% test.
+
+Default rule: one document = one whole play or essay. Every page of a given play goes
+entirely into one split — no play gets divided.
+
+The one exception — Sonnets: since each of the 154 sonnets stands completely on its
+own, "one document" for this section means one sonnet, not the whole 154-sonnet
+collection. So sonnets get split individually, roughly 70/15/15 by count, rather than
+all going into a single split.
+
+Everything else in Poems stays whole: Venus and Adonis, The Rape of Lucrece, A Lover's
+Complaint, The Passionate Pilgrim, Sonnets to Sundry Notes of Music, and The Phoenix
+and the Turtle are each one complete short work — no special treatment needed, they
+just follow the default rule.
+
+One dependency I flagged: several sonnets can share the same scanned page. This plan
+only actually works if your semantic chunking splits text at sonnet boundaries rather
+than page boundaries — otherwise one chunk could still blend a train sonnet with a test
+sonnet. Worth saying that explicitly in the docs so it doesn't quietly become a gap
+later.
+
+Want me to log this as the answer to the Sonnets question, or if anything needs
+adjusting before we treat it as final for this item.
+
+[USER]
+about the dependency , after we get ocr text we can think about that from a text basis
+not from a page basis. but in A2 we will be finetuning the ocr ig. so we will be leaking
+some data
+
+also write instrcution in the log to remove the about the testing we have done, it does
+not seem well
+
+also get the log file with the reply to this text, its way up in the chat
+
+[AI]
+Here's what I added, in plain terms:
+
+On the chunking dependency: you're right — that's actually resolved, not a problem.
+Chunking happens on the OCR'd text, not the raw page image, so splitting sonnets
+cleanly in the text is fine regardless of how they're laid out on the physical page.
+
+But you found a real new leak, one level up: if OCR fine-tuning in A2 uses images from
+pages that later become your test set, the OCR model has already "seen" those pages
+before the test even runs — that's leakage too, just at the OCR stage instead of the
+retrieval stage. I logged it as its own item so it doesn't get missed when A2 planning
+happens — the fix is simply: whatever pages get reserved for testing need to stay out
+of OCR fine-tuning data as well.
+
+On removing the "just ran trials" language: logged as its own instruction — anywhere
+the docs currently explain an answer by pointing back at informal testing rather than
+just stating the decision, that framing comes out.
+
+[re-presented A1_form_changelog.md]
+
+[USER]
+But you found a real new leak, one level up: if OCR fine-tuning in A2 uses images from
+pages that later become your test set, the OCR model has already "seen" those pages
+before the test even runs — that's leakage too, just at the OCR stage instead of the
+retrieval stage. I logged it as its own item so it doesn't get missed when A2 planning
+happens — the fix is simply: whatever pages get reserved for testing need to stay out
+of OCR fine-tuning data as well.
+
+-> we will not use them in both training and testing, thats why the splits are for
+
+"The one way data could leak, and how we checked"
+
+-> by using seperate document/story for train/val/test. not on page basis
+
+[AI]
+Fair — you're right, that one's already covered. Since the split happens at the
+whole-document level (not page level), a play sitting in the test split never has any
+of its pages show up anywhere else — OCR fine-tuning included. I've marked that resolved
+in the log rather than as an open risk.
+
+And logged your answer for "the one way data could leak, and how we checked":
+- The risk: pages from the same document ending up in different splits.
+- The check: we split on whole document/story, never on individual pages — so every
+  play, essay, or (for Sonnets) individual sonnet goes entirely into one of
+  train/val/test.
+
+Section 2 is looking pretty settled now. Want to keep going on anything else here, or
+move to Section 3?
+
+[USER]
+"Preparing the scans — answer each for your corpus"
+
+first of all if we included "what we did about it" as "Not applied". we did not need to
+furthe add anything to "The effects of the change" Do we??
+
+[AI]
+Good question — and I think the honest answer is: no, not always. It depends on whether
+there's real evidence behind "not applied" or not.
+
+[table of 5 rows: Deskew/Denoise/Binarize/Remove blank pages/Normalize text, with
+judgment on which "Effects" entries are filler vs real evidence]
+
+So the rule I'd suggest: if "What we did" is "Not applied" and you don't have real
+evidence to back it up, just leave "Effects" as blank or "N/A" — don't force a
+sentence. But if you do have real evidence (like the CER numbers for denoise), keep it,
+because that's not narrating the testing process — it's the actual reason the decision
+holds up. That also lines up with your earlier instruction to cut the "haven't tested
+this yet" trial-talk — those specific two rows (deskew, binarize) are exactly that kind
+of filler.
+
+Let me log this so it's not lost.
+
+[logged]
+
+[USER]
+add them in the preparation table
+
+| Preparation question | What we did about it | Effect on the data |
+| Rasterization & image generation | Rendered PDF pages into PNG images using PyMuPDF
+at 300 DPI. | Converted vector PDF pages into OCR-ready bitmap images while preserving
+page layout. |
+| Resolution scaling | Rendered all pages at 300 DPI. | Increased character resolution,
+improving readability and OCR accuracy, especially for small fonts. |
+| Anti-aliasing | Used PyMuPDF's default anti-aliased rendering. | Smoothed character
+edges and reduced jagged artifacts, producing cleaner text for OCR. |
+
+[AI]
+Added — those three rows fill in the previously-empty ones in the template
+(rasterization, resolution scaling, anti-aliasing), all tied to the actual PyMuPDF
+extraction step already built. Section 2's preparation table is now at 8 rows total.
+Anything else here, or on to Section 3?
+
+--- SECTION 2 END / SECTION 3 START ---
+
+[USER]
+going to section 3
+
+we also have a need_ocr field (not all pages needs ocr, speacially introductory
+publication pages, glossary and shit). we will not have the ocr_confiedence field.
+
+[AI]
+Logged both. So the schema now:
+- need_ocr goes in — since we already know from toc.json that things like the Character
+  Index and Glossary don't need OCR at all (reference sections, not narrative text), the
+  schema should carry that flag through rather than assuming every page gets OCR'd.
+- No ocr_confidence field — dropped.
+
+What's next for Section 3 — the schema fields themselves (page_id, category,
+layout_type, ocr_text, ocr_engine, and now need_ocr), or do you want to go through the
+findings/example-pages part first?
+
+[USER]
+we missed one thing we did on scanned pages, on section 2
+
+we had a reconstruction for the double column pages in the scans. add that in the table
+the code was ->
+[reorder_two_column function code]
+dont add code
+
+[AI]
+Added, no code — just the plain description: split the two-column page into left/right
+halves at the page midpoint, read each half fully top-to-bottom (left column first, then
+right), instead of reading straight across. And the effect: without it, OCR blended
+unrelated sentences from both columns together; with it, the text comes out in correct
+reading order.
+
+That's now Section 2's preparation table at 9 rows total. Back to Section 3 whenever
+you're ready.
+
+[USER]
+for the last table in section 3 . add the short excerpt of the pages as follows
+
+bio_001
+"THERE is no name in the world of literature like the name of WILLIAM SHAKESPEARE.
+Homer broke as a sudden dawn through the darkness of the earlier ages"
+
+page_500
+[raw OCR excerpt with recognition errors — "wereotherwise", "togall", "slecping", etc.]
+
+page_501
+[raw OCR excerpt including an interleaved line from the right-hand column]
+
+[AI]
+Logged all three. One correction I want to flag on myself: I initially thought that odd
+"We see the appearing buds..." line in the page_0501 excerpt looked like an error worth
+double-checking — but it's actually not a mistake at all. That line is the right-hand
+column of that same page, bleeding into the left column's text because this excerpt is
+raw native OCR output, before column reconstruction. It's actually a really good
+real-world illustration of the exact two-column reading-order problem this whole data
+speciality is about — I've updated the log to say that instead, and flagged it as worth
+calling out explicitly in the docs rather than just quietly including it.
+
+--- SECTION 3 END / SECTION 5 START ---
+
+[USER]
+start on section 5 lets go
+
+first do an analysis on the facets and the answers written there. they seem somewhat
+less informative and wrong in some scenarios to me.
+
+so first explain what each facets means and what is the goal of this section and then
+lets fix them one by one and log the changes
+
+[AI]
+Good, let's do this properly. First, here's what each of the 8 facets actually means —
+plain terms:
+
+[table: Problem / Data / Model / Method / Design / Development / Deployment / MLOps —
+what each one asks]
+
+The actual goal of this whole section: it's not "describe what you did" — it's "show
+you thought about the trade-off." For every row you need: your choice, why it fits this
+corpus specifically, what it costs you, and what would make you change your mind. A
+one-line description with no reasoning scores zero, per the course's own rubric.
+
+Now — going back through what's there, I found three real problems, not just "could be
+more detailed":
+1. Data facet has a stale number. It says "~1,360 PNG images" — that was our old rough
+   guess. We now know the real number is 1,374 total pages. Should be updated to the
+   real figure.
+2. Method facet actually contradicts what we just decided in Section 2. It currently
+   says "no cropping, straightening, or enhancement applied yet" — but we just
+   documented in Section 2 that we did apply anti-aliasing, 300 DPI resolution scaling,
+   and the two-column reconstruction. So right now, Section 2 and Section 5 tell two
+   different stories about the same pipeline. That's a real inconsistency, not just thin
+   writing.
+3. Development facet has the "we just ran trials" language you already told me to cut
+   — it's still sitting there from before that instruction.
+
+Want to go through these three first, one at a time, starting with the Data facet's
+page count fix — or start somewhere else?
+
+[USER]
+we are only discussing about the A1 tasks here right? we dont need to add anything we
+will do it in the future A2, A3 or A4 right?
+
+[AI]
+Yes, exactly — A1 is just the plan on paper for everything except Stage 1 (Ingest),
+which you've actually already built. So for Section 5's eight-facet table:
+- Problem, Data, Model, Method, Design, Development, Deployment, MLOps — these are all
+  describing Stage 1 (Ingest/Enhance), which is already done. So these should describe
+  what you actually did, not a future plan.
+- Nothing here requires building A2/A3/A4 work now. If a facet talks about something
+  from a later stage, it should just say "planned for A2" and stop — not pretend it's
+  built.
+
+So the three issues I found are still worth fixing, and they're all A1-scope:
+1. Data facet's page count — just a stale number, needs updating to 1,374. Nothing to
+   build.
+2. Method facet contradicting Section 2 — this is purely a "these two sections need to
+   agree with each other" fix, since both are describing the same already-finished Stage
+   1 work.
+3. Development facet's "just ran trials" language — same cleanup you already asked for
+   elsewhere, just missed this spot.
+
+None of these ask us to do new work — just make the write-up accurate to what's already
+built. Want to start with #1 (the page count)?
+
+[USER]
+so update every facet with the updated informations you recieved from section 2 and 3
+that we discussed. be direct about it
+
+Development facet's "just ran trials" language can stay here
+
+about the models, i also ran the baydu/ultimate-ocr. do we need to add anything about
+it?
+
+[AI]
+All logged. Quick summary of what changed:
+- Problem & Data facets — dropped the "1904" mention (per your rule), and Data now has
+  the real numbers: 121 MB source PDF, 1,374 total pages, 4.51 GB of output images.
+- Method facet — this was the actual contradiction, now fixed: it used to say nothing
+  was done, now it correctly lists the 300 DPI rendering, anti-aliasing, and two-column
+  reconstruction — matching Section 2.
+- Design, Deployment, MLOps — no changes needed.
+- Development — left exactly as-is, per your call.
+
+On Unlimited-OCR: it doesn't belong in this table — this table is specifically about
+Stage 1 (turning the PDF into images), and Unlimited-OCR is an OCR model, a different
+stage entirely. It belongs in Section 6 instead (the pipeline table's OCR row,
+alongside Tesseract and PaddleOCR) — I'll add it there when we get to that section.
+
+Want to keep going in Section 5, or move on?
+
+[USER]
+do we need any change here?? "One decision where we chose one option over another"
+
+[AI]
+Yes, one small thing — same issue as the Development facet, except this one does need
+the trial-narration language removed (you only said to keep that phrasing in
+Development specifically, not everywhere).
+
+Right now it says "our early trial already reaches..." and "the trial data so far...
+supports that bet" — that's the same "just ran trials" framing you asked me to cut
+elsewhere. The actual content underneath is still accurate (2-9% CER on single-column,
+~15-20x gap from reading order) — it just needs to be stated as a fact, not narrated as
+a test result.
+
+[rewrote the trade-off cell without trial-narration language, logged]
+
+Logged. Same numbers, just stated directly instead of framed as "our trial showed."
+Anything else in Section 5, or ready to move on?
+
+--- SECTION 5 END ---
+
+
+REFLECTION
+==============================================================================
+
+I started with a version-1 document in which I had already asked the AI to fill out the form based on our EDA analysis.
+In practice, we ran an evaluation file, extracted the key findings and main decisions from it, and then asked the AI to populate the form primarily from that information.
+
+The relevant files are:
+
+pdf_to_images.py, shakespeare_ocr_evaluation.ipynb, unlimited_ocr_benchmark.ipynb, toc.json
+
+After deciding on the changes recorded in the log (A1_form_changelog.md), I gave the AI another prompt to create a version-2 document.
+The reflections for each section are as follows:
+
+For Section 2, I used the AI to independently verify a corpus-identity claim I had
+made (the "1904 Oxford Edition" guess) — it checked the actual Internet Archive
+catalog page and confirmed my correction (P.F. Collier & Son, exact year unknown) was
+right, and found an additional cross-check I hadn't noticed (Sir Henry Irving listed as
+a contributor, matching our own toc.json). I accepted that verification. I rejected an
+early AI-drafted answer that described our test-split plan with a rule-inconsistency
+(holding out "a handful of sonnets" while claiming a whole-document split) — the AI
+flagged this itself when I pushed back on it, and we worked out together that the fix
+was to redefine "one document" as "one sonnet" specifically for the Sonnets section,
+rather than break the whole-document rule generally. I provided all of the real
+measured numbers myself (page counts, file sizes, word-count estimate) — the AI's
+earlier drafted numbers had been rough placeholders, which I replaced with real ones I
+had actually checked.
+
+For Section 3, I decided the data schema fields myself (adding need_ocr, dropping
+ocr_confidence) and provided the real OCR output excerpts for the three example pages
+myself, including one with a visible column-order OCR error — the AI mis-flagged that
+error as a possible mistake to check, and I let the conversation reveal it was
+actually a genuine example of the two-column reading-order problem we're building the
+project around, which we kept as an intentional illustration rather than fixing it away.
+
+For Section 5, I asked the AI to explain what each of the eight facets was actually
+asking before touching any answers, then had it review the existing answers against
+what we'd already decided in Sections 2 and 3. It found a real inconsistency (the
+Method facet claimed no image preprocessing was done, contradicting Section 2, which
+documents that we did apply resolution scaling, anti-aliasing, and column
+reconstruction) — I had it fix that specific contradiction rather than rewriting
+answers wholesale. I made the call on which stage (A1 vs. later milestones) each facet
+should describe, and decided where a new detail (testing baidu/Unlimited-OCR) actually
+belonged in the document versus where it didn't apply.
+
+The Created md file after the complete conversation with ai:
+
+# A1 Form — Decisions Log
+
+This file tracks what we decide, section by section, while going through the form
+together. Nothing here gets put into the actual `.docx` until you say so — this is just
+our shared notes.
+
+Status key: 🟡 open question — needs your input | ✅ decided | ⏸️ parked for later
+
+---
+
+## Section 2 — Corpus
+
+### 1. Which edition this actually is
+✅ **Decided.** It's the P.F. Collier & Son edition on Internet Archive (not "1904 Oxford
+Edition" — that was wrong, now fixed). I double-checked the Internet Archive page myself
+and it holds up — publisher matches, copyright status matches, and there's a bonus
+confirmation: the archive lists Sir Henry Irving as a contributor, which matches your
+toc.json's "Shakespeare and Bacon, by Sir Henry Irving" section.
+
+**Still needs doing:** the README and other files still say "1904 Oxford Edition" in a
+few places — needs a global fix once we're done here.
+
+### 1b. Improvement — stop guessing a year anywhere
+🆕 **New instruction from you.** We don't actually know the exact printing year — only
+"early 1900s." So:
+- Never write a specific year (like "1904") anywhere in the docs, in any section — always
+  say "early 1900s" instead.
+- In the Licence answer specifically, don't explain *why* we don't know the year (no "we
+  corrected an earlier guess" type context) — just state the licence cleanly. A reader
+  shouldn't need backstory to understand that one answer.
+
+### 2. Exact file size of our page-image dataset
+✅ **Decided — real numbers now, not estimates.**
+- Total pages in the PDF: **1,374**
+- Biographical Introduction + Shakespeare and Bacon: **37 pages** (`bio_001`–`bio_037`)
+- Literary works (the plays/poems themselves): `page_0001`–`page_1322`
+- Source PDF file size: **121 MB**
+- Our own extracted page images: **4.51 GB** (exact, not rounded)
+
+### 3. Word count of the corpus
+✅ **Decided — our own rough estimate, not an outside number.**
+- ~800 words/page average (based on OCR-ing a few pages)
+- ~1,300 pages of actual writing (the literary works, not front matter)
+- **Estimate: 1,000,000+ words**
+
+### 4. Test-split plan
+✅ **Split ratio decided: 70% train / 15% validation / 15% test.**
+
+**The plan (write-up before we lock it into the docx):**
+
+- **Default rule — split by whole document.** For Comedies, Histories, Tragedies, and
+  the two Biography pieces, each work is one document. Every page of a given play/essay
+  goes entirely into one split — never divided between two.
+
+- **Exception — Sonnets only.** The Sonnets section is 154 individual sonnets, and each
+  one is fully self-contained (Sonnet 18 doesn't depend on Sonnet 17 the way Act 2 depends
+  on Act 1). So here, "one document" = one sonnet, not the whole section. Sonnets get
+  split individually, roughly 70/15/15 by count, instead of the section going entirely
+  into one split.
+
+- **Other individual poems stay whole-document.** *Venus and Adonis*, *The Rape of
+  Lucrece*, *A Lover's Complaint*, *The Passionate Pilgrim*, *Sonnets to Sundry Notes of
+  Music*, and *The Phoenix and the Turtle* are each their own short, complete work — these
+  follow the default rule, each one assigned entirely to a single split.
+
+- **One thing this depends on:** several sonnets can sit on the same scanned page. This
+  plan only actually avoids leakage if the semantic-chunking step (the bonus feature)
+  splits text at sonnet boundaries, not page boundaries — otherwise one chunk could still
+  mix a train sonnet and a test sonnet on the same page. Worth stating this dependency
+  explicitly in the docs rather than leaving it implied.
+
+- **Resolved — chunking side is fine.** Chunking happens after OCR, on the extracted
+  text, not on the raw page image. So splitting at sonnet boundaries in the text is no
+  problem regardless of how sonnets are laid out on the physical page.
+
+- **New leak risk found — OCR fine-tuning (A2) — resolved.** I'd flagged that OCR
+  fine-tuning in A2 could leak if it used images from test-split pages. You're right that
+  this is already covered: since whole documents (not individual pages) get assigned to
+  exactly one split, a test-split play's pages never appear anywhere else — including OCR
+  fine-tuning data. Nothing extra needed here; the document-level split handles it.
+
+### 4b. "The one way data could leak, and how we checked" — answer
+✅ **Decided.** The one leak risk: putting different pages of the *same* document into
+different splits. How we checked/prevented it: by splitting on whole document/story, not
+on individual pages — so every page of a given play, essay, or (for Sonnets) individual
+sonnet lands in exactly one of train/val/test, never split across two.
+
+### 5. The three play titles for the other categories
+✅ **Confirmed.** *Comedy of Errors*, *King John*, and *Othello* are all real, correctly-
+categorized titles in your toc.json — no more checking needed there.
+
+### 6. Scan & script difficulty — two more observations, plus a formatting instruction
+🆕 **New from you, on top of what was already written:**
+- Inside the single-column dense prose (Biographical Introduction), there are places with
+  **smaller-font quotes from different people/characters** mixed in — a sub-structure
+  within what looked like plain prose.
+- The **start of each drama has a character-introduction section** (the cast list /
+  "dramatis personae") — this is its own distinct structure, different from both the
+  prose and the two-column dialogue.
+
+**Formatting instruction:** write this whole section as a **list**, not one paragraph —
+each distinct layout type gets its own bullet point.
+
+### 7. Preparation table (deskew/denoise/etc.)
+✅ **Decided — "Effects" column only needed when there's real evidence, not by default.**
+Rule: if "What we did" is "Not applied" and there's no real evidence behind it, leave
+"Effects" blank/N/A rather than writing a filler sentence. If there IS real evidence
+(numbers, a measurement), keep it — that's justification, not filler.
+- Deskew → drop the effects sentence (currently just "not tested yet" - filler)
+- Denoise → keep it (cites real CER numbers - genuine evidence)
+- Binarize → drop the effects sentence (currently just "haven't tested it" - filler)
+- Remove blank pages → keep it (something was actually done here)
+- Normalize text → already just "N/A", fine as-is
+
+**New rows to add (filling the 3 previously-empty template rows):**
+
+| Preparation question | What we did about it | Effect on the data |
+|---|---|---|
+| Rasterization & image generation | Rendered PDF pages into PNG images using PyMuPDF at 300 DPI. | Converted vector PDF pages into OCR-ready bitmap images while preserving page layout. |
+| Resolution scaling | Rendered all pages at 300 DPI. | Increased character resolution, improving readability and OCR accuracy, especially for small fonts. |
+| Anti-aliasing | Used PyMuPDF's default anti-aliased rendering. | Smoothed character edges and reduced jagged artifacts, producing cleaner text for OCR. |
+
+**One more row still to add — two-column reading-order reconstruction:**
+
+| Preparation question | What we did about it | Effect on the data |
+|---|---|---|
+| Two-column reading-order reconstruction | For pages with a two-column layout, split the detected text into a left half and a right half at the page's midpoint, then read each half top-to-bottom on its own — left column fully, then right column fully — instead of reading straight across the page. | Without this step, OCR read both columns as if they were one continuous line, mixing unrelated sentences from the left and right column together. With it, the text comes out in the correct, natural reading order. |
+
+### 8. Instruction — stop narrating "we just ran trials" in the docs
+🆕 **New from you.** Wherever the docs currently explain an answer by saying something
+like "this is just an early trial" / "we've only run tests so far, not built the real
+thing" — remove that framing. It reads poorly. Answers should state the actual decision
+or plan cleanly, without narrating the informal experimentation that got us there.
+
+---
+
+## Section 3 — What the data shows
+
+### 1. Data schema — two decisions
+✅ **Add a `need_ocr` field.** Not every page needs OCR — the toc.json already tracks
+this per-section (e.g. the Character Index and Glossary are marked `need_ocr: false`,
+since they're reference material, not narrative text). The schema should carry this
+field through rather than assuming every page gets OCR'd.
+
+✅ **No `ocr_confidence` field.** Dropped from the schema.
+
+### 2. Three example pages — excerpts decided
+✅ **These are real OCR output** (not cleaned-up ground truth) — includes actual
+recognition errors, which is honest and shows the pipeline as it really behaves.
+
+**`bio_001`:**
+> THERE is no name in the world of literature like the name of WILLIAM SHAKESPEARE. Homer
+> broke as a sudden dawn through the darkness of the earlier ages
+
+**`page_0500`:**
+> Fal. I would it were otherwise; I would my means were greater and my waist slenderer.
+> Ch. Just. You have misled the youthful prince. Fal. The young prince hath misled me: I
+> am the fellow with the great belly, and he my dog...
+>
+> *(raw OCR output — includes real recognition errors like "togall", "sleeping" →
+> "slecping", stray characters like "s", "br", "mlg" — kept as-is since this is meant to
+> show actual pipeline output, not a cleaned-up version)*
+
+**`page_0501`:**
+> perceived the first white hair on my chin. About it; you know where to find me. [Exit
+> Page.] A pox of this gout! or, a gout of this pox! for the one or the other plays the
+> rogue with my great toe. It is no matter if I do halt; I have the wars for my colour,
+> and my pension shall seem the more reasonable. A good wit will make use of anything. I
+> will turn diseases to commodity
+>
+> *(correcting myself — I first flagged the "We see the appearing buds..." line as a
+> possible error, but it's not: that's the right-hand column of this same page bleeding
+> into the left column's text, because this excerpt is native/unreconstructed OCR output.
+> It's actually a good real example of the exact two-column reading-order problem this
+> whole project is built around — worth keeping as-is for that reason, maybe even calling
+> that out explicitly in the docs as a live illustration.)*
+
+---
+
+## Section 5 — Eight-facet table (Stage 1: Ingest)
+
+### Corrections from Section 2/3, applied directly
+
+**Problem facet** — fix the year mention (per the "no specific year" rule): "the 1904
+edition" → "the early-1900s edition."
+
+**Data facet** — replace the old rough numbers with the real ones from Section 2:
+- Input: the source PDF, 121 MB, 1,374 total pages.
+- Output: 1,374 PNG page images at 300 DPI, 4.51 GB total (37 biographical front-matter
+  pages + 1,322 main-corpus pages).
+- Also drop "the 1904 edition" wording here too, same fix as Problem.
+
+**Method facet — this was the real contradiction.** It currently says "no cropping,
+straightening, or enhancement applied yet," which directly conflicts with what Section 2
+now documents. Corrected to actually list what was done:
+- Rendered at 300 DPI (resolution scaling)
+- PyMuPDF's default anti-aliased rendering (smooths character edges)
+- Two-column reading-order reconstruction for two-column pages (split at the gutter,
+  read each column top-to-bottom, left column then right)
+
+**Design facet** — no change, nothing from Section 2/3 affects this one.
+
+**Development facet** — staying as-is, per your call. Not touching this one.
+
+**Deployment facet** — no change.
+
+**MLOps facet** — no change.
+
+### About baidu/Unlimited-OCR — does it need to go here?
+**No, not in this table.** This eight-facet table is specifically about Stage 1
+(Ingest) — turning the PDF into page images. Unlimited-OCR is an *OCR* model (Stage 3),
+not part of ingest, so the Model facet correctly staying "no model, just PyMuPDF" is
+still accurate.
+
+Where it *does* belong: **Section 6**, the pipeline-stage table, in the OCR/HTR row —
+that row already lists Tesseract and PaddleOCR as candidates, and Unlimited-OCR should
+be added there as a third one you actually tested, once we get to that section.
+
+### One more fix — the "one trade-off" cell
+✅ **Needs the trial-narration language removed** (same issue as elsewhere, except this
+one wasn't given an exception — only Development was). Currently says "our early trial"
+and "the trial data so far" — same content, stated as a fact instead:
+
+> We chose to feed OCR engines the raw page PNGs directly, with no deskew/denoise/
+> binarization, instead of building a dedicated image-cleanup stage — the scans are clean
+> by inspection, and single-column pages already reach 2–9% CER with no cleanup applied.
+> The trade-off: less-clean sections of the corpus not yet OCR'd may need cleanup we
+> haven't built; we're betting reading-order reconstruction is the bigger lever, since it
+> accounts for roughly a 15–20x CER gap on two-column pages, versus no evidence yet that
+> image cleanup would matter as much.

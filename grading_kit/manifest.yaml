@@ -4,23 +4,20 @@
 # ONLY this file; it points to the rest. Build/run scripts and the eval
 # tasks are NAMED here, not copied, so they never go stale.
 
-project_id: ""              # your team id
+project_id: "G08"              # your team id
 
 axes:
-  domain: ""                # your corpus subject / real user (see Roster; one per team)
-  data_speciality: ""       # ONE hard property of your corpus you are handed (see Data-Speciality Catalog)
-                            #   e.g. bangla | arabic | code-switching | degraded-scans | multi-column |
-                            #        handwritten | old-orthography | math-notation | dirty-ocr | ...
-                            #   (English is not a speciality; if your corpus is English, pick a data condition.)
-  primary_nfr: ""           # ONE quality you optimise ABOVE baseline (see NFR sheet). Faithful &
-                            #   accurate are REQUIRED of everyone (baseline), so they are NOT choices.
-  nfr_target: ""            # the concrete target you commit to for that NFR, e.g. "p95 latency <= 300ms",
-                            #   "peak RAM <= 2GB", "ECE <= 0.05", "PII recall >= 0.98"
+  domain: "Classical English Literature — The Complete Works of William Shakespeare (plays, poems, sonnets), for a student or teacher verifying the exact wording/source of a line, scene, or quotation before citing it academically"
+  data_speciality: "multi-column"       # multi-column reading-order: two-column justified play/verse
+                                        # text breaks naive OCR order unless columns are reconstructed
+  primary_nfr: "robust"           # answer quality must not collapse on the less-common single-column
+                                   # layout vs. the majority two-column layout
+  nfr_target: "median reconstructed two-column CER <= 2x median single-column CER"
 
 corpus:
   path: data/raw/                   # where the scanned page-images live
-  pages: 0                          # total pages  (floor: >= 300)
-  words: 0                          # total words  (floor: >= 60000)
+  pages: 1374                       # total pages  (floor: >= 300)
+  words: 1000000                    # total words, estimated  (floor: >= 60000)
   provenance: data/provenance.md    # source + licence + counts
 
 heldout:

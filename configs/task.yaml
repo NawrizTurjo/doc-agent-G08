@@ -1,7 +1,7 @@
 # Stage 0 — problem statement (one per group). Set by assignment.
-group_id: "G00"
-domain: "almanacs/panjika"
-data_speciality: "degraded-scans"   # ONE hard corpus property (English is not one)
-primary_nfr: "reproducible"
-nfr_target: "p95 latency <= 300ms"   # your concrete committed target
-corpus: {min_pages: 300, min_words: 60000, source_url: "", license: ""}
+group_id: "G08"
+domain: "Classical English Literature — The Complete Works of William Shakespeare (plays, poems, sonnets), for a student or teacher verifying the exact wording/source of a line, scene, or quotation before citing it academically"
+data_speciality: "multi-column"   # multi-column reading-order: two-column justified play/verse text breaks naive OCR order unless columns are reconstructed
+primary_nfr: "robust"
+nfr_target: "median reconstructed two-column CER <= 2x median single-column CER"   # your concrete committed target
+corpus: {min_pages: 300, min_words: 60000, source_url: "https://www.kaggle.com/datasets/abhishekroy48/complete-works-of-shakespeare", license: "Public domain (Internet Archive rights review: NOT_IN_COPYRIGHT)"}

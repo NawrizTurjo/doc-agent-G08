@@ -1,0 +1,553 @@
+HEADER
+======
+Member name: Nawriz Ahmed Turjo
+Student number: 2105032
+Sections led: Section 1 (Our Problem & Our Three Choices), Section 4 (Risks)
+
+
+FULL CONVERSATION
+=============================
+
+--- SECTION 1 & SECTION 4 (Initial Combined Review) START ---
+
+[USER]
+(Uploaded files: README.md, 04-Project-Walkthrough.pdf, A1_form_Shakespeare_RAG.md)
+
+I have provided the project walkthrough and the context of our project so far in the md
+file, read them first
+
+for the A1 submission guidelines (sir has provided a form, and we filled up all
+initially, and now verifying those fillup values)
+we have done so far all the sections except section 1 and 4
+
+for these 2 sections
+you need to explain the sections, find any gaps in the said fillup parts (typically the
+right side of the table), then suggest the fixes that might be required for me to fillup
+
+[AI]
+Read through the walkthrough guide and your filled A1 form (both the README context and
+the actual form). Here's the review for Sections 1 and 4.
+
+## Section 1 — Our Problem & Our Three Choices (20 pts)
+
+**What it's actually asking:** the task itself is fixed for everyone ("read a scanned
+page, answer a question grounded in it"). This section is where you prove your project
+is a genuinely different instance of that task via three specific, testable choices
+(domain, data speciality, NFR+target), plus who it's for and two numbers: a success
+target and a baseline to beat.
+
+**What's strong:** Domain, data speciality, and NFR are all specific, non-generic, and —
+critically — each justification points to a real measurement from your own corpus (the
+page_0500 CER numbers) rather than a vague claim. That's exactly what the "grounding
+gate" at the bottom of your form rewards. "Who would use this" is a real persona with a
+real decision, not "the marker." No complaints there.
+
+**Gaps found:**
+
+1. (High priority) The baseline number is borrowed from the guide's own worked example,
+   not measured. Your "score to beat" cell says: "~0.4 answer-F1... we adopt 0.4 as our
+   working target given the similar task structure." Compare this to the walkthrough's
+   own Team G07 example: "'Return the top matching chunk word-for-word' scores about 0.4
+   answer-F1." That's the identical number from the guide's illustrative fictional team,
+   not something computed from Shakespeare data. Two problems: (a) a baseline's actual
+   value depends on your specific corpus/chunking, not on "task structure being similar"
+   — every team has the same task structure by the course's own design, so that
+   reasoning would justify copying the number for any team, which defeats the point;
+   (b) your form's own grounding-gate warning says unsupported answers score zero for
+   that item, and a number lifted verbatim from the course's example is about as
+   unsupported as it gets.
+   Fix: Either drop the specific number and just state the baseline method honestly
+   ("top-1 retrieved chunk verbatim, scored by exact-overlap F1 — not yet computable, no
+   retrieval built until Stage 5; we expect it to be low given exact-quote-style
+   questions"), or run a quick proxy now using your 7 already-transcribed ground-truth
+   pages (hand-pick a couple of questions, do naive keyword match against the raw
+   Tesseract text) and label it explicitly "provisional, from a 7-page pilot, to be
+   finalized in A3."
+
+2. (Medium) Your groundedness target (≥0.9) also matches the guide's example exactly.
+   Less alarming than #1 since 0.9 is a fairly generic, defensible groundedness target
+   (not corpus-dependent the way an F1 baseline is), but worth adding one independent
+   sentence for why 0.9 specifically fits your project (e.g. "a misquoted line is
+   actively worse than no answer for a citation-checking use case, so we set a high
+   bar") rather than leaving it looking like a second copied number sitting right next
+   to the first.
+
+3. (Worth confirming, not necessarily wrong) "Centrally assigned" language. The
+   walkthrough's intro says "You are centrally assigned a distinct combination of these
+   three, so copying another team's work never fits your own project." Your form frames
+   the three choices as things your team picked to fit a corpus you found. The form's
+   own per-axis instructions ("Pick a practical, real-world subject... No two groups
+   share one") support free choice with a uniqueness check rather than a top-down
+   assignment, so this is likely just loose wording in the guide — but it's worth a
+   quick confirmation with your instructor that Domain/Speciality/NFR weren't meant to
+   be assigned to you rather than chosen, and that no other team has already claimed
+   "Classical Literature" as domain.
+
+## Section 4 — Risks (10 pts)
+
+**What it's actually asking:** five honest, corpus-specific answers — PII, licensing,
+OCR failure, hallucination, bias — where vague or generic answers lose marks and "N/A"
+is only acceptable if truly inapplicable.
+
+**What's strong:** all five rows are filled with real evidence (archive.org
+rights-review status, actual measured CER numbers, honest "not yet built" admissions for
+hallucination) rather than placeholder text. This section is in noticeably better shape
+than the baseline issue above.
+
+**Gaps found:**
+
+1. (Low-medium) "Bias across your corpus" only covers one dimension. You currently
+   discuss layout-type bias (two-column vs single-column). Section 2 of your own form
+   separately documents old-orthography features (ae ligatures, archaic punctuation,
+   Latin block quotes) in the Biographical Introduction — a second plausible bias axis
+   (older typeface/orthography reading worse) that you've already found evidence for but
+   haven't folded into this row. The guide's own example for this row is specifically
+   about a typeface-era gap, so adding a second sentence here would strengthen it:
+   "secondarily, old-orthography passages (ae ligatures, Latin quotations) in the
+   Biographical Introduction may read worse than modern-typeface prose — not yet
+   measured separately from other single-column pages."
+
+2. (Worth reconciling) Edition name mismatch across your own documents. Your README
+   opens with "The Complete Works of William Shakespeare (1904 Oxford Edition)", but
+   Section 2/4 of the actual A1 form identify the source as the "P.F. Collier & Son
+   edition." Since your licensing evidence in Section 4 rests on the exact scan/edition
+   identity, it's worth making sure README, the A1 form, data/provenance.md, and
+   configs/task.yaml all name the same edition — a marker cross-checking your documents
+   against each other is exactly the kind of grounding-gate check this course seems to
+   run.
+
+3. (No action needed, just FYI) The walkthrough PDF describes Section 4 as including a
+   sixth row — "one decision where you chose honesty over a better score" — but your
+   actual form doesn't have a cell for it, and your form's own grading table at the
+   bottom only lists PII/licence/OCR/hallucination/bias for this section's 10 points. So
+   this isn't a gap in your fillup — the form you were given simply doesn't require it
+   here (it likely lives in your Section 5 trade-off cell instead, which you've already
+   filled).
+
+Bottom line: Section 4 needs only a minor addition (bias dimension #1) plus a
+documentation-consistency check (#2). Section 1 is mostly solid, but the baseline row
+(#1) is the one cell I'd fix before submitting — it's the clearest concrete risk of
+losing points under your own grounding gate.
+
+--- SECTION 1 & SECTION 4 (Initial Combined Review) END ---
+
+
+--- SECTION 1: Three-Choices Table (①②③) START ---
+
+[USER]
+ok let's go one by one
+starting from section-1
+
+what is the first table's values and why they are correct or not?
+and how can I improve it
+explain only this table
+
+[AI]
+Focusing only on the first table in Section 1 — the ①②③ three-choices table. Here's what's
+in it, row by row.
+
+**① Domain**
+"Classical English Literature — the complete works of William Shakespeare (plays, poems,
+sonnets), for a literature student, teacher, or independent reader who needs to find and
+verify a specific line, scene, or quotation."
+
+Correct, with one soft caveat. The guide asks for a practical subject + a real user, and
+this gives both — "verify a specific line before citing it" is a real, testable
+decision, not a vague "helps people learn." The caveat: you've named three personas
+(student, teacher, independent reader) in one cell, and the same three-way spread
+reappears later in "Who would use this." The guide's own example (Team G07) commits to
+one persona — "a farmer or extension officer." Naming three doesn't break any rule, but
+it slightly weakens the design: your NFR target, latency budget, and UI choices later on
+should ideally be optimized for someone specific. A teacher fact-checking a class handout
+and a casual reader browsing have different tolerance for latency, different question
+styles, etc.
+Improvement: pick one primary persona (I'd suggest "student/teacher verifying a
+quotation for academic use" since it's the sharpest, highest-stakes case) and mention the
+others as secondary users in passing, if at all.
+
+**② Data speciality**
+"Multi-column layout — the play text (Comedies, Histories, Tragedies — the large
+majority of the corpus) is printed in a justified two-column layout with running
+headers, which breaks naive OCR reading order."
+
+Correct, and actually your strongest cell in this table. "Multi-column layout" is one of
+the guide's own explicitly listed valid data specialities, it correctly avoids the
+"English is not a speciality" trap by giving a real structural condition instead, and
+it's scoped honestly ("large majority," not "all pages" — you're not overclaiming into
+the Poems/Sonnets/Reference sections you haven't confirmed yet).
+Improvement: none needed for this cell as written. The only thing to watch is
+downstream, not here: once you confirm the Sonnets layout, make sure this cell's "large
+majority" framing still holds and isn't quietly contradicted elsewhere.
+
+**③ Primary NFR + target**
+"Robust / reliable — answer quality must not collapse on one of our two structurally
+different page layouts... Target: median reconstructed two-column CER stays within 2x of
+median single-column CER, measured across our full 25-page ground-truth set."
+
+Mostly correct, two things to tighten.
+
+1. Naming. Your form's own menu of valid NFRs lists "robust" (not "reliable") as an
+   option. Calling it "Robust / reliable" reads like you've merged two separate
+   qualities into one hybrid label. Not disqualifying, but cleaner to just say "Robust,"
+   matching the rubric's vocabulary exactly — it removes any ambiguity about which
+   official NFR category you're claiming.
+
+2. Scope of the target. This is the more substantive issue. Right now the target is
+   defined entirely at the OCR stage (CER ratio). That's a legitimate, well-evidenced
+   proxy for A1 — you have real numbers backing it, which is more than most cells in
+   this table can claim. But "robust" as an NFR is supposed to describe a property of
+   the system's answers, not just one internal pipeline stage (compare the guide's other
+   NFR examples — calibrated, private, explainable — all measured at the answer/output
+   level, not mid-pipeline). As written, someone reading ahead to A3/A4 (where you'll
+   need to prove your NFR "in production") won't see how CER parity turns into a claim
+   about grounded answer quality.
+   Improvement: add one sentence stating the CER ratio is your Stage-3 proxy metric, and
+   that it will roll up into an answer-level metric in A3 — e.g. "grounded-answer
+   accuracy on questions sourced from two-column pages stays within a stated margin of
+   accuracy on single-column-sourced questions." That one addition makes the NFR
+   traceable end-to-end instead of stopping at OCR, which is exactly what A4 Section 5
+   will later demand you prove.
+
+[USER]
+you also need to provide the corrected values as well
+for the first table, what you just mentioned, do provide them, so I can replace those in
+place
+
+[AI]
+Here are the ready-to-paste replacements for the two cells that needed changes. ② Data
+speciality stays as-is — no correction needed there.
+
+① Domain — replace with:
+"Classical English Literature — the complete works of William Shakespeare (plays, poems,
+sonnets), for a student or teacher who needs to find and verify the exact wording of a
+line, scene, or quotation before citing it academically (a general independent reader is
+a secondary beneficiary of the same tool)."
+
+③ Primary NFR + target — replace with:
+"Robust — answer quality must not collapse on one of our two structurally different page
+layouts (single-column prose vs. two-column verse/drama) just because it's the
+less-common one. Target: median reconstructed two-column CER stays within 2x of median
+single-column CER."
+
+One note: since ③'s target now has an added sentence, the "Justify each of the three
+choices → Why this NFR + target" cell right below it (which currently only argues for
+the CER-ratio part) may eventually want a matching one-line addition once you're ready to
+touch that table — but that's the second table, so I'll leave it for when we get there.
+
+--- SECTION 1: Three-Choices Table (①②③) END ---
+
+
+--- SECTION 1: Justification Table START ---
+
+[USER]
+now for the 2nd table "Justify each of the three choices"
+discuss the changes needed and the solved values
+
+[AI]
+Here's the second table — three cells: Why this DOMAIN / Why this DATA SPECIALITY / Why
+this NFR + target.
+
+**Why this DOMAIN**
+Meets the guide's two requirements (a real decision, and why a document-reading agent
+beats a web search) — but it still says "A reader (student, teacher, enthusiast)", which
+no longer matches the narrower primary persona we just set in Table 1. It also states
+the need ("find a specific line") more than the decision ("is this quotation accurate
+enough to cite").
+
+**Why this DATA SPECIALITY**
+Strong and well-evidenced — but it contains a factual error. It says two-column pages
+are "roughly two-thirds of the corpus (Comedy/History/Tragedy)." Checking your own
+toc.json numbers from the README: Comedy (399) + History (352) + Tragedy (458) = 1,209
+pages out of 1,322 main-corpus pages = ~91%, not two-thirds. This is worth fixing
+precisely because it's an understatement — the real number makes your case for this
+being the data speciality stronger, not weaker, and a marker who checks your own numbers
+against this cell will catch the discrepancy either way.
+
+**Why this NFR + target**
+Covers all three required elements (why it matters, why that number, the trade-off) but
+has two smaller issues:
+1. It never ties back to a specific user, just "a Shakespeare-lookup tool" — generic,
+   when you now have a sharper persona from Table 1 to anchor it to.
+2. The comparison quietly cherry-picks: it gives single-column CER as "0.02-0.09" using
+   only Tesseract/PaddleOCR/docTR, while the two-column "0.76-0.82" figure it's compared
+   against includes EasyOCR too. EasyOCR actually scores badly on single-column pages as
+   well (0.33-0.35) — so the "before" side of the comparison isn't apples-to-apples
+   across engines. Worth naming this honestly; it's actually a useful secondary finding
+   (EasyOCR's problem isn't reading order, it's weaker underlying recognition), not
+   something to hide.
+
+Corrected values:
+
+Why this DOMAIN:
+"A student or teacher deciding whether a quotation is accurate enough to cite in an
+essay or lecture needs to verify its exact wording and locate the specific scene,
+speaker's line, or sonnet it comes from — without paging through a 1,300+ page book by
+hand (a general reader benefits from the same lookup, but citation-accuracy is the
+sharper, highest-stakes case). A document-reading agent is the right fit because the
+answer must be traceable to an exact printed page: a web search would surface modern
+commentary, paraphrase, or unreliable transcriptions rather than the primary text
+itself, which defeats the purpose of citation-checking."
+
+Why this DATA SPECIALITY:
+"Measured directly on page_0500-page_0503 (two-column play text from Second Part of King
+Henry IV), every engine's native (un-reconstructed) reading order scored 76-82% CER,
+because it reads straight across both columns instead of finishing the left column
+first. Reconstructing column order (splitting text boxes at the page gutter, sorting
+each column top-to-bottom) brought CER for our best engine down from 0.77 to 0.04 on the
+same pages. This forces a dedicated column-reconstruction step between Layout and
+OCR/Index — not optional post-processing, but the difference between usable and
+unusable transcription for roughly 90% of the corpus by page count (1,209 of 1,322
+page_-prefixed pages are Comedy/History/Tragedy, per our toc.json)."
+
+Why this NFR + target:
+"Our corpus mixes single-column prose (Biographical Introduction) and two-column
+dramatic text, and a student or teacher citing a scene from the far more common
+two-column pages needs an answer as trustworthy as one drawn from the single-column
+Biographical Introduction. Our measurements show that cliff exists before
+reconstruction: for our three stronger engines (Tesseract, PaddleOCR, docTR),
+single-column CER sits at 0.02-0.09 versus 0.76-0.82 on two-column pages, unreconstructed.
+(EasyOCR is a separate case — it scores poorly even on single-column pages, 0.33-0.35, so
+reading order isn't its main weakness; its underlying recognition is.) After
+reconstruction, the gap mostly closes for our two leading candidates: 0.02-0.09
+single-column vs. ~0.04-0.07 two-column for Tesseract and PaddleOCR. We're targeting
+<=2x CER gap post-reconstruction because that's roughly where those two engines already
+land — an evidence-based target, not a round guess, currently measured at the OCR stage
+and intended to roll up into an answer-level accuracy comparison in A3. Trade-off:
+hitting this consistently may mean dropping EasyOCR/docTR (currently 0.32-0.43
+reconstructed CER) even if they're easier to integrate."
+
+--- SECTION 1: Justification Table END ---
+
+
+--- SECTION 1: "The Rest of the Framing" Table START ---
+
+[USER]
+ok looks good to me
+now, for the next table in section-1: "The rest of the framing"
+go and find (if) any fixes need, and what to write there
+
+[AI]
+Here's "The rest of the framing" table — three cells: Who would use this / How we
+measure success / Score we want to beat.
+
+**Who would use this**
+Same issue as the original Domain cell: it still lists all three personas ("student or
+teacher... or a general reader") rather than the narrowed primary persona we settled on
+in Table 1. Needs to be brought in line so the form reads as one consistent decision, not
+three different personas depending on which cell you're reading.
+
+**How we measure success**
+The number (0.9) is fine and standard, but as flagged earlier it's the same figure the
+guide's own example uses, with no independent reasoning for why 0.9 specifically fits
+your project. It also doesn't connect to the NFR risk you already established
+(two-column pages being the harder majority) — an easy, free cross-reference to add.
+
+**Score we want to beat**
+This is the cell we already flagged as the real problem: it states "~0.4" as an "adopted
+working target" while admitting it isn't actually measured — and that number is lifted
+directly from the guide's own fictional example. This needs a genuine fix, not just a
+wording tweak: state the baseline method clearly, be honest that it isn't computable yet
+(Stage 5 doesn't exist), and — since you have real domain insight here — note why this
+particular baseline might behave differently for a quote-lookup corpus than for G07's
+summarization-style task. That's a stronger answer than a borrowed number, because it
+shows you've actually thought about what the baseline means for your specific questions.
+
+Corrected values:
+
+Who would use this:
+"A student or teacher who wants to quickly find and verify the exact wording of a
+specific line, character's speech, or sonnet in our early-1900s edition, with a citation
+back to the exact printed page — e.g. confirming a quote is accurate before citing it in
+an essay or lecture (a general reader benefits from the same lookup as a secondary use
+case)."
+
+How we measure success:
+"Groundedness >= 0.9 — at least 90% of answers fully supported by (quoted from) the
+cited page. For a citation-verification tool, an ungrounded answer risks the reader
+citing a fabricated or misattributed quotation in academic work, which is worse than the
+tool simply declining to answer. We set the bar at 0.9 (at most 1 in 10 answers needing
+manual double-checking) since that overhead is still far below the cost of manually
+searching a 1,300+ page book, while acknowledging this will be hardest to sustain on the
+two-column majority of the corpus flagged under our NFR."
+
+Score we want to beat:
+"Return the top-1 retrieved chunk verbatim, scored by word-overlap F1 against the gold
+answer span. Not yet computed — Stage 5 (Retrieval) doesn't exist yet, so this number
+isn't measurable until A3; we will report our own figure then rather than reuse a number
+from a different corpus. One expectation worth flagging now: because many of our
+verifiable questions ask for a short, exact quotation (e.g. "What is the first line of
+Sonnet 18?"), a correctly-retrieved raw chunk may score higher on this baseline than in a
+summarization-style task — if so, that raises the bar our agent has to clear, since
+extract+cite must add real value beyond "found the right chunk" (e.g. trimming to the
+exact requested line rather than returning an untrimmed passage). Whatever this baseline
+measures empirically, our agent must beat it."
+
+--- SECTION 1: "The Rest of the Framing" Table END ---
+
+
+--- SECTION 1: Sanity Check START ---
+
+[USER]
+so section-1 is complete??
+do a sanity check, for this section (as you have built so far), with other sections
+
+then we will work on fixing section-4 next
+
+[AI]
+## Sanity check — Section 1 against the rest of the form
+
+Section 1 content itself: all three tables (three-choices, justify, framing) are now
+internally consistent — same persona throughout (student/teacher, citation-accuracy
+focus), same NFR name ("Robust," not "Robust/reliable"), same 90% figure. So yes, Section
+1 is content-complete against the 20-point rubric ("the three choices are specific,
+valid, and distinct").
+
+Cross-checked against Sections 2-8:
+
+- "Robust" naming vs. how it's referenced elsewhere: Confirmed, not just consistent —
+  Section 7.3 already says "traceable errors support our 'robust' NFR" (line 187), using
+  the bare name. Our fix to drop "/ reliable" actually brings Table 1 in line with
+  wording the rest of the form was already using.
+- 90% (Comedy+History+Tragedy) figure vs. Section 2's page counts: Matches exactly:
+  399+352+458 = 1,209 of 1,322 main-corpus pages = 91.4%, and Section 2 states those same
+  totals.
+- Narrowed persona (student/teacher) vs. Section 7.4 eval questions: Reinforces it —
+  your eval set already mixes exact-quote lookups and light-reasoning questions ("How
+  does Falstaff's view of honour differ from Hotspur's?"), which is exactly what a
+  teacher prepping a lesson would need, not just a casual reader.
+- Baseline methodology (word-overlap F1, "extract must beat raw chunk") vs. Section
+  7.2's extract tool description: Matches — Section 7.2 already justifies extract on the
+  grounds that "a literature user wants the precise wording, not a paraphrase" (line
+  179), same logic as our corrected baseline cell.
+- Groundedness ≥0.9 vs. Section 7.5 "Ungrounded answer" / Section 6 Stage 9: Consistent
+  — grounding gate and abstention behavior both tie back to this same metric.
+- "roughly two-thirds" (old, wrong) fraction — did it leak into any other section?: No —
+  checked Sections 2-7, that number only ever appeared in the one cell we already fixed.
+  Nothing else to propagate.
+
+Two open items — not Section 1 content bugs, but worth resolving before you submit (both
+flagged earlier, still unresolved):
+
+1. Edition name mismatch. README says "1904 Oxford Edition"; Section 2/4 of the actual
+   form say "P.F. Collier & Son edition." This doesn't touch Section 1, but it's a real
+   inconsistency across your own documents worth fixing before submission.
+2. "Centrally assigned" question. Still worth a quick confirm with your instructor that
+   your domain/speciality/NFR combo wasn't meant to be assigned rather than chosen
+   freely — can't resolve this from the documents alone.
+
+Section 1 is solid. Ready to move to Section 4.
+
+--- SECTION 1: Sanity Check END ---
+
+
+--- SECTION 4: Risks — Review & Fix START ---
+
+[USER]
+for the first question, I will verify it
+and the 2nd one, yeah, it was chosen from a set of options on domain type, NFRs and our
+supervisor approved that
+
+now, inspect section-4 and find if anything needs to fix
+
+then give those fixed values
+
+[AI]
+## Section 4 review
+
+Checked all five rows against the guide's requirements, against each other, and against
+Section 1's now-corrected numbers/persona. Four rows are fine as-is. One needs a real
+fix.
+
+PII — fine as written, no content issues. (Only touches the edition name, which you're
+already verifying.)
+
+Licensing/copyright — fine as written, well-evidenced. (Same edition-name dependency,
+same note as above — no action from me until you confirm.)
+
+OCR failure — fine as written. Worth noting: it already contains a useful detail —
+"secondarily on Latin-quotation / old-orthography passages (accented characters, ae
+ligatures) in the Biographical Introduction" — that turns out to matter for the next
+row.
+
+Hallucination — fine as written, consistent with Section 7.3's k_max and the
+grounding/abstention behavior described there.
+
+Bias across your corpus — needs fixing. Three issues:
+
+1. It says "the majority of the corpus" for the two-column pages — vague, when Section 1
+   now states the precise figure (91%, 1,209/1,322 pages). Should match.
+2. It only covers one bias axis (column layout). The OCR-failure row right above it
+   already surfaced a second one — old-orthography/typeface bias in the Biographical
+   Introduction — but it never gets carried into this row, even though this is exactly
+   the "bias" question.
+3. It never ties back to your NFR (this bias gap is literally the thing your Robust
+   target is trying to close) or to your persona (a student looking up a sonnet vs. a
+   play line gets a different-quality answer) — both easy, free connections that make
+   the row read as considered rather than isolated.
+
+Corrected value:
+
+"Two-column play/verse pages (~90% of the main corpus by page count — Comedies,
+Histories, Tragedies, per our toc.json) will read worse than the single-column
+Biographical Introduction unless reconstruction is used everywhere it's needed — this is
+the exact gap our Robust NFR target is designed to close, so an unresolved bias here
+directly threatens that target. A secondary axis: old-orthography passages (ae
+ligatures, Latin quotations) within the single-column Biographical Introduction itself
+may also read worse than the surrounding modern-typeface prose, per the same OCR-failure
+evidence above — not yet isolated as its own measurement."
+
+That's the only row that needed a rewrite. Once you resolve the edition-name question,
+it's worth a quick re-read of PII and Licensing to make sure the edition detail they cite
+matches whatever you settle on — but no content changes needed there beyond that.
+
+--- SECTION 4: Risks — Review & Fix END ---
+
+
+REFLECTION
+==============================================================================
+
+I started with a version of the form that was already filled in by AI — as per our exploratory data analyses, I'd used an earlier pass to get a first draft of Section 1 and Section 4
+down. This conversation was me going back through that draft, table by table, to check
+whether it actually held up against the course's walkthrough guide, our own corpus
+numbers, and our supervisor's project assignment sheet.
+
+Before we started, I gave the AI our README.md as project context — that file itself is
+a summarized writeup from an earlier chat where we'd worked through the corpus/OCR
+extraction side of the project (page extraction, the OCR engine trials, the CER
+numbers), so handing it over as the starting point let this conversation pick up the
+project state without me re-explaining everything from scratch. I also uploaded the
+actual A1 form as a converted .md file rather than the original .docx — markdown is a lot
+more token-efficient for the AI to read and edit than a Word doc, so that was mostly a
+practical choice to keep things cheaper and faster while we went back and forth.
+
+The biggest thing I accepted was the fix to our "score we want to beat" baseline. We had
+written ~0.4 answer-F1 as our target, and it turned out that number was just copied from
+the course guide's own worked example (Team G07's fictional number), not anything we'd
+actually measured. I hadn't noticed that myself since it read like a normal citation, so
+catching that was genuinely useful — we don't have retrieval built yet, so there's no way
+we could have a real number anyway. I accepted the fix to just state the baseline method
+honestly instead of keeping a borrowed number that could've looked like fabricated
+results under the grounding-gate rule.
+
+I also accepted a bunch of smaller consistency fixes: narrowing our domain/persona down
+to "student or teacher" instead of listing three different user types across different
+cells, correcting a factual mistake where we'd said two-column pages were "roughly
+two-thirds" of the corpus when the real number from our own toc.json is closer to 90%,
+and expanding the "Bias across your corpus" row in Section 4 to also mention the
+old-orthography issue in the Biographical Introduction, which we'd already documented
+elsewhere but never actually connected to the bias question.
+
+The one thing I pushed back on was the NFR naming. The AI suggested shortening "Robust /
+reliable" to just "Robust" to match the rubric's vocabulary more cleanly, and at the time
+that seemed reasonable so I went with it. But when I went back to check our supervisor's
+actual project assignment sheet, our row lists the NFR exactly as "Robust / reliable" —
+so I reverted that change back to match what was actually assigned to us rather than what
+sounded cleaner. That same check made me go back and look at our Data speciality wording
+too, and I caught that we'd written "Multi-column layout" when the sheet's official term
+for our row is "Multi-column reading-order" — so I fixed that to match as well, since
+it's the same kind of mistake (using our own phrasing instead of the exact assigned
+term).
+
+Overall I'd say I accepted most of the content-level suggestions since they were backed
+by our own data, but the naming ones needed a human check against the actual assignment
+sheet rather than just trusting what sounded more standard.
