@@ -12,7 +12,7 @@ axes:
                                         # text breaks naive OCR order unless columns are reconstructed
   primary_nfr: "robust"           # answer quality must not collapse on the less-common single-column
                                    # layout vs. the majority two-column layout
-  nfr_target: "median reconstructed two-column CER <= 2x median single-column CER"
+  nfr_target: "F1 Drop < 10%"
 
 corpus:
   path: data/raw/                   # where the scanned page-images live

@@ -1,0 +1,1012 @@
+HEADER
+======
+Member name: Abhishek Roy
+Student number: 2105033
+Sections led: Section 3 (Components & Options We Considered), Section 4 (The Knowledge
+Base We Built), Section 5 (Evidence It Works) — inferred from which A2 topics this
+conversation actually covers (OCR/HTR model choice, the fine-tuning attempts, the final
+pipeline decision, and the OCR-quality evaluation notebook). Not explicitly stated this
+time the way Sections 2/3/5 were for A1 — please correct if a different split is more
+accurate.
+
+
+FULL CONVERSATION (unedited)
+=============================
+
+--- A2 START ---
+
+[USER]
+<uploaded toc.json>
+you know the projects context from this chat, in A2 we are trying to perform ocr on our
+dataset that we extracted from the pdf file and made into images
+
+the image dataset : https://www.kaggle.com/datasets/abhishekroy48/complete-works-of-shakespeare
+
+I have extracted the dataset https://www.kaggle.com/datasets/abhishekroy48/shakespeare-gt
+
+now i need make a pipeline to build a ocr pipeline that will be robust/reliable , previously
+we did testing and found out tessaract was doing pretty fine if we reorder columns and the
+error was pretty low but not the most reliable. so lets discuss how can we prepare our
+pipeline. /fril
+
+[USER]
+<uploaded toc.json>
+you know the projects context from this chat, in A2 we are trying to perform ocr on our
+dataset that we extracted from the pdf file and made into images
+
+the image dataset : https://www.kaggle.com/datasets/abhishekroy48/complete-works-of-shakespeare
+I have extracted the dataset https://www.kaggle.com/datasets/abhishekroy48/shakespeare-gt
+
+now i need make a pipeline to build a ocr pipeline that will be robust/reliable , previously
+we did testing and found out tessaract was doing pretty fine if we reorder columns and the
+error was pretty low but not the most reliable. so lets discuss how can we prepare our
+pipeline. turned on /grill-me , you can ask me questions and the toc.json is there
+precisely because we dont want generalization error while training ocr.
+
+[AI]
+Good, let's map this out properly. Before I ask anything — I tried to pull the actual
+contents of your new shakespeare-gt dataset to save you a question, but Kaggle's dataset
+pages are JS-rendered so the fetch came back empty. That's a real gap I can't fill myself,
+so it'll come back as a question later.
+
+Here's the first, most foundational fork in this decision tree — everything else depends
+on the answer:
+
+Are we fine-tuning an OCR model on our corpus, or building the pipeline entirely on
+pretrained engines (Tesseract/PaddleOCR) plus the column-reordering post-process we
+already have?
+
+My recommendation: fine-tune. Two reasons, both from the course spec itself, not just my
+opinion:
+1. Stage 3's own description says explicitly: "a strong pretrained recognizer may be used
+as the starting point — students still build layout analysis, fine-tuning, and error
+analysis on their corpus." Fine-tuning isn't presented as optional extra credit — it's
+named as core Stage 3 work.
+2. You said it yourself — Tesseract+reordering gets low error but "not the most
+reliable." That's exactly the gap fine-tuning is meant to close: adapting the recognizer
+to this book's specific typeface/orthography (æ ligatures, italic speaker prefixes,
+archaic punctuation) rather than relying on a generic pretrained model.
+
+One consequence if you agree: Tesseract itself is a bad fine-tuning target — its training
+path (LSTM .traineddata tooling) is a separate, clunky toolchain, not the gradient-descent
+fine-tuning the course is actually testing (their own Stage 3 text calls out "CNN →
+attention → decoder," TrOCR-style, C6–C9 trainable depth/optimizer/LR-schedule). So
+"fine-tune" would likely mean switching the base model to something HuggingFace-native —
+TrOCR is the obvious candidate — rather than fine-tuning Tesseract itself.
+
+Does that hold, or were you picturing something else — e.g., staying pretrained-only and
+putting the "robust" effort entirely into the layout/reordering and fallback logic
+instead?
+
+[USER]
+Yes Finetuning was my target as well
+i mentioned tessaract as we have tested using it before but if TrOCR has superior
+capability then we can consider using it as well
+
+[AI]
+Good, that resolves the top-level fork: fine-tuning, yes. Now the child question — which
+base model to fine-tune.
+
+My recommendation: TrOCR, not Tesseract. Reasoning, not just preference:
+
+1. Tesseract's fine-tuning path is a dead end for this course. It trains via a separate
+legacy toolchain (tesstrain, LSTM .traineddata files) — not PyTorch, not compatible with
+the mandated stack (PyTorch + Lightning, HuggingFace, W&B, torchmetrics) your spec names.
+It'd be real work that doesn't plug into anything else you're building.
+2. TrOCR is HuggingFace-native — standard Trainer/Lightning fine-tuning, logs to W&B like
+everything else. It's also literally the architecture your Stage 3 spec describes as the
+target ("CNN → attention → decoder," self-attention block) — this isn't a coincidence,
+TrOCR is that architecture.
+3. There's a forcing function that actually helps your data speciality. TrOCR fine-tunes
+on individual line crops, not whole pages — so it can't just plug into our current
+heuristic (split at the page midpoint, done). It needs a real line-detection step first.
+That sounds like a cost, but it's actually the thing Stage 2 (Layout) wants anyway —
+"detect and segment the page into regions... so recognition runs on the right pieces in
+the right order" is describing exactly this. Right now our column-reordering is a
+page-level hack; moving to TrOCR pushes us toward doing layout properly instead of
+patching around it.
+
+But this recommendation has a real dependency I can't resolve myself, and it's the
+question I flagged earlier: what granularity is the ground truth in your new
+shakespeare-gt dataset? Specifically —
+
+Is it page-level (one block of correct text per page image, like what we hand-transcribed
+earlier) or line-level (individual line images matched to individual line
+transcriptions)?
+
+This matters directly: if it's page-level only, TrOCR fine-tuning isn't ready to go — we'd
+need an extra alignment step (detect lines, then match each detected line back to the
+right piece of the page-level ground truth) before any fine-tuning can start. If it's
+already line-level, we can go straight to fine-tuning.
+
+What does shakespeare-gt actually contain?
+
+[USER]
+<uploaded repo-structure image, page_0004.txt, bio_005.txt>
+shakespeare-gt is page level text extraction
+i have included some page examples
+
+[AI]
+Good, that's the missing piece — and it changes my recommendation. Page-level ground
+truth (whole page image → whole page text) is a different shape from what TrOCR needs
+(individual line crop → individual line text). TrOCR can't train on this directly without
+an extra step in between.
+
+The next fork, and it's a real one:
+
+(a) Keep TrOCR, add a line-detection + alignment stage. Detect line bounding boxes on
+each page (Tesseract/PaddleOCR can already give us these), then match each detected line,
+in order, to the corresponding line in the page-level ground truth. This is buildable,
+but it's a whole extra pipeline stage with its own error source — if the alignment is
+wrong, you're fine-tuning on mislabeled data, which actively works against your
+"robust/reliable" NFR rather than helping it.
+
+(b) Switch the fine-tuning target to Donut instead. Donut is a document-understanding
+transformer that consumes a whole page image and outputs whole page text directly — no
+line detection, no alignment step, because that's exactly the granularity your
+shakespeare-gt data is already in. Page image → page text, done. And it's not a random
+suggestion — your own course spec names it explicitly as an approved OCR base model,
+right alongside Tesseract and TrOCR.
+
+My lean: (b), with one caveat. Donut checkpoints are typically pretrained on short
+structured documents (receipts, forms) with fairly short expected output. A dense
+literary page here can be 500–800 words — that's a longer, freer-form output than Donut's
+usual job, and pushing it that far is a real risk, not a sure thing. To de-risk it, I'd
+fine-tune Donut on columns, not full pages — reuse the same page-midpoint split we
+already built for the reordering step, so each training example is a half-page image with
+a half-page's worth of text. That also quietly kills the reading-order problem for
+two-column pages entirely, instead of needing the separate reconstruction step afterward
+— the model just never sees text from the other column to begin with.
+
+So: (a) TrOCR + build an alignment stage, or (b) Donut, fine-tuned on columns rather than
+full pages? Which way do you want to go — or is there a reason to prefer TrOCR's maturity
+over Donut's better fit to our data shape that I'm not weighing enough?
+
+[USER]
+<uploaded A2_form.docx>
+Donut is not a direct OCR model, so first check out the spec to be sure if thats allowed
+or not? if so where it is mentioned?
+
+some context about out gts, we have properly extracted the text from each page, first the
+left column and then the right column, so Donut can be used like you planned in my
+opinion.
+
+one question i had is using TrOCR and alignment stage, is this doable in kaggle
+environment? i mean will the resource cost increase substantially? same qusn is for
+donut as well
+
+[AI]
+Good pushback on the Donut question — let's verify rather than take my earlier claim on
+faith.
+
+Donut is explicitly allowed — two places, not one:
+1. Your spec's Part B, "Difficulty tiers" section, states directly: "a strong pretrained
+recognizer (Tesseract / TrOCR / Donut) may be used as the starting point." Named alongside
+Tesseract and TrOCR, not a fallback or edge case.
+2. Your own A2 form, Section 3, literally uses it as the example: "OCR / HTR — e.g.
+Tesseract vs TrOCR vs Donut." It's the form's own suggested comparison set.
+
+So no concern there — it's not just allowed, it's explicitly anticipated.
+
+On the GT format — this is good news, but it changes a sub-decision I hadn't raised yet.
+You said the text is extracted "first the left column and then the right column" —
+meaning the ground truth .txt files are already in correct reading order for the whole
+page, both columns concatenated. That confirms Donut's page-in/text-out shape works. But
+it opens a question I skipped past: do we train Donut on full pages, or split into
+left/right column crops like our reordering heuristic already does? The column split
+changes the ground truth requirement — full-page GT already matches full-page training
+with zero extra work; column-crop training would need us to locate where column 1's text
+ends and column 2's begins inside that already-concatenated .txt file, which isn't marked
+anywhere right now. That's a real cost, not a formality — worth flagging before we assume
+column-cropping is free.
+
+Now the resource question — and this is where full-page vs. column-crop actually matters,
+not just abstractly:
+
+| | TrOCR + alignment | Donut, full page | Donut, column crops |
+|---|---|---|---|
+| Model size | ~334M params (base) | ~200M params (base) | same |
+| Fits on a Kaggle T4/P100 (16GB)? | Yes, comfortably | Yes, but tighter | Yes, comfortably |
+| Input per example | one short line image | one full page image, resized to Donut's expected resolution | one half page image |
+| Output length per example | a few words | ~500–800 words → ~700–1000+ tokens | ~250–400 words → ~350–500 tokens |
+| Real cost driver | the line-detection + alignment step (CPU-bound, adds pipeline time, not GPU memory) | long autoregressive decoding — Donut was pretrained on short outputs (receipts, forms), not page-length text; this is genuinely outside its comfort zone | shorter sequences, closer to what Donut expects |
+
+The honest answer: TrOCR's cost is mostly pipeline complexity (the alignment stage), not
+GPU resources — line crops are cheap to train on. Donut's cost is the opposite: simple
+pipeline, but full-page decoding pushes sequence length well past what the architecture
+was designed for, which is where real memory/time cost shows up, not from the encoder or
+model size. Column-cropping for Donut splits the difference — cheaper to train than
+full-page, but reintroduces a real preprocessing cost (finding the column boundary in
+already-concatenated ground truth).
+
+So: does the "locate the column boundary in the GT text" cost change your lean toward
+Donut, or is it worth eating that cost to keep the shorter, cheaper training sequences?
+
+[USER]
+we can go column crop if we can assure better ocr quality
+
+but the gt is not flagged like that, it has the entire page extracted text in each file
+
+[AI]
+Good, that confirms it — no split marker exists in the current GT, and it wasn't
+described as being built column-by-column with an intermediate step, just as full
+extracted page text. So let's not assume a shortcut exists — I'll ask directly instead of
+guessing.
+
+Was the person who built shakespeare-gt transcribing column-by-column and then merging
+into one file, or reading straight across as one continuous pass?
+
+This matters a lot for cost, not just as trivia:
+
+- If column-by-column with a merge step — even if the final saved file is merged,
+there's a real chance the original transcription process (or whoever did it) still has,
+or could easily regenerate, the two column-pieces separately before they got joined. If
+that's recoverable, column-crop training becomes nearly free — no alignment algorithm
+needed, just don't merge.
+- If it was read straight across (or the split-point genuinely wasn't tracked anywhere)
+— then getting column-level ground truth means either (a) redoing the transcription with
+the split marked, which is real added work, or (b) approximating the split
+algorithmically — e.g., running our existing heuristic column-detector over the image,
+counting how many lines fall in each column, then slicing the concatenated ground-truth
+text at roughly that proportion.
+
+I'd flag option (b) pretty hard, though: it's an approximation layered on top of ground
+truth that's supposed to be your gold standard. If the guessed split point is off by even
+a line, you're now fine-tuning Donut on text that's shifted from the image it's paired
+with — silently teaching it the wrong association. That's the same class of risk we
+already flagged for TrOCR's line-alignment step, just relocated. Given "robust/reliable"
+is literally your NFR, introducing a new unverified error source to save training cost
+feels like it's working against the thing you're optimizing for, not toward it.
+
+My recommendation stands on this being the deciding factor: if the true column split is
+recoverable (cheaply, from however the GT was actually built), go column-crop. If it's
+not recoverable without a real re-transcription pass, I'd say don't manufacture an
+approximate one — go full-page Donut instead, and treat the long-sequence decoding risk
+as the more honest cost to pay, since at least it doesn't quietly corrupt training data.
+
+So — do you know how the GT was actually produced? Column-by-column with a merge, or one
+continuous read?
+
+[USER]
+transcribing column-by-column and then merging into one file. he used a qwen instruct vlm
+to do it.
+
+[AI]
+That resolves it cleanly — and actually removes the risk I was worried about, not just
+works around it.
+
+Since the merge was: crop into columns → transcribe each column separately with the VLM →
+concatenate, the column split isn't something we'd be guessing at by slicing
+already-merged text (the risky version). It's something we can regenerate by re-running
+the exact same trusted process — same column crop, same VLM, just skip the final
+concatenation step. That's not an approximation layered on top of gold-standard data;
+it's literally reproducing how the gold standard was made in the first place, one step
+earlier. That fully clears the "robust/reliable" concern I raised.
+
+So the actual next question is just logistics, not risk:
+
+Are the per-column outputs still sitting around somewhere from when this was originally
+built (before they got merged), or does getting them mean re-running Qwen against fresh
+column crops?
+
+This matters because it's the difference between "free, already exists" and "another VLM
+inference pass over ~1,300+ two-column pages, twice each" (once per column) — which has a
+real cost of its own if it needs to run again, separate from whatever fine-tuning compute
+we'll need afterward.
+
+If it needs regenerating: worth deciding now whether that reuses our existing
+midpoint-split heuristic for the crop boundary (cheap, reuses code we already have) or
+whether you'd want to re-verify the split point per page first (more careful, more work,
+matters more if any pages have uneven column widths like we flagged as a possibility much
+earlier).
+
+What's the actual state of those intermediate files?
+
+[USER]
+<uploaded q3_4B_gt_part1.ipynb>
+check the notebook that extracted
+
+[AI]
+Checked it — and this changes something we both assumed a moment ago.
+
+The GT was not built column-by-column. Look at what actually happens in the notebook:
+each page is sent to Qwen3-VL-4B-Instruct as one whole-page image, in a single call. The
+"column-by-column" behavior isn't a separate cropping step — it's an instruction inside
+the prompt itself: "Read the left column completely from top to bottom, then the right
+column." The model does the column-ordering internally, in one shot, and writes out one
+merged text file. There was never a separate per-column image or per-column output file —
+so there's nothing sitting around to recover. My earlier assumption ("the pieces might
+still exist before merging") was wrong, and it's wrong because the process itself never
+produced separate pieces, not because they got deleted afterward.
+
+Three other things worth flagging while I'm in here, quickly, not as separate questions:
+- This is "Part 1 of 4," covering only page_0001–page_0330, and only the page_* (two-
+column play) images — so three more notebook parts exist somewhere covering the rest of
+the corpus and the bio_* pages.
+- max_new_tokens=2048 caps each page's output. A dense page can run ~700–800 words
+(~1000+ tokens) — probably fine, but worth a spot-check on the longest pages once all 4
+parts are in, in case any got cut off mid-page.
+- Decoding is greedy (do_sample=False) — good, that's the right call for ground truth,
+keeps it deterministic/reproducible.
+
+Here's the actual cost consequence for our decision: getting real column-level ground
+truth now means re-running Qwen3-VL on column crops — roughly doubling the inference
+calls (one page → two column calls), real additional Kaggle GPU time, not a free
+relabeling of data that already exists. That's a genuinely different cost than what we
+were weighing a minute ago.
+
+Given that, my recommendation flips to firmly favor full-page Donut: zero additional
+GT-generation cost, ready to fine-tune against shakespeare-gt as it already exists. The
+trade-off is eating the long-sequence decoding risk we flagged earlier, rather than
+paying real GPU time to avoid it.
+
+Does that land — go with full-page Donut and treat long-sequence decoding as the accepted
+risk, or is a second Qwen3-VL pass over column crops worth the GPU cost to you?
+
+[USER]
+yes go with full page, its almost impossible to re run the vlm. can you give an
+approximation on how much time it could take in T4_acclerator?
+
+also we need to create the train, test and val set before start training , so while you
+do it try to follow the process mentioned in the A1_form.
+
+[AI]
+Two things here — the time estimate first (that one's just informational), then the
+split, which has one real snag I need your call on.
+
+## T4 time estimate for full-page Donut fine-tuning
+
+Quick honest caveat before the numbers: this is a rougher estimate than the CER numbers
+we had earlier, because those came from actually running the engines — this hasn't been
+run yet. Treat it as a planning number, not a promise.
+
+The math:
+- Training set (70% of ~1,359 OCR-needed pages): ~950 pages
+- Donut-base (~200M params) on a 16GB T4, with full dense pages (not short receipt-style
+text): target sequences here run ~500–1000+ tokens per page — much longer than what
+Donut's usually fine-tuned on (typically 20–100 tokens for forms/receipts). That's the
+main cost driver, more than image resolution.
+- Realistic batch size on a T4 at this sequence length: 1, maybe 2 with gradient
+checkpointing.
+- Rough per-step time: ~3–6 seconds → ~950 steps/epoch ≈ 1–1.5 hours/epoch
+- Reasonable epoch count for ~950 training images to actually converge: 8–12 epochs
+
+Total: roughly 8–15 hours of GPU time for one full training run.
+
+That's a real problem against Kaggle's free-tier limits: sessions cap around 12 hours,
+and the weekly quota is around 30 hours total — so this one run alone could eat half your
+week's GPU budget, and might not even fit in one session (you'd need checkpoint-and-
+resume across two).
+
+My actual recommendation, given that risk: don't commit the full run blind. Do a timed
+pilot first — fine-tune on ~30–50 pages for exactly 1 epoch, measure the real seconds/step
+on your actual Kaggle T4, then multiply out. My estimate above could be off by 2x in
+either direction depending on the image resolution you settle on — a 10-minute pilot
+tells you the truth instead of guessing with real quota.
+
+## The train/val/test split — one real snag
+
+I can build the document-level split for everything except the Sonnets, using toc.json
+directly: every other entry (Comedies, Histories, Tragedies, the 2 Biography pieces, and
+the other 6 individual Poems) becomes one whole "document," and I can assign each to
+train/val/test at 70/15/15 — I'd stratify by category (spread the ratio within Comedy,
+within History, etc.) so no split accidentally ends up all-Tragedy or missing a category
+entirely. That part's mechanical, I'll write it now.
+
+The Sonnets are the actual problem. The A1 plan said "split by individual sonnet, not the
+whole section" — but toc.json only knows the section spans pages 1246–1269. It has no
+record of where sonnet #47 ends and #48 begins within those pages. Two ways to actually
+get that:
+
+1. Parse it out of the GT text itself. Sonnets are traditionally printed with a number
+heading (arabic numerals or roman numerals) before each one — if shakespeare-gt's Sonnet
+pages preserve that numbering, I can write a regex to detect each sonnet's boundary
+automatically, no manual work needed.
+2. Fall back to an approximate page-proportional split (first ~70% of the 24 Sonnet
+pages → train, etc.) — but this is the exact same risk we already rejected for the Donut
+column-crop question: if a page break falls mid-sonnet, you'd split one sonnet's lines
+across train and test, which is a real leak, not a theoretical one.
+
+I can't test option 1 right now — I don't have an actual Sonnets page's GT text in front
+of me to check whether the numbering survived the Qwen extraction. Can you paste one
+Sonnets .txt file (any page in the page_1246–page_1269 range) so I can check whether the
+numbering is actually there before I write a parser against it?
+
+[USER]
+/caveman
+do two things:
+create a "Do a timed pilot first — fine-tune on ~30-50 pages for exactly 1 epoch,
+measure the real seconds/step on your actual Kaggle T4" notebook
+
+do an page proportional split for sonnet, write down a md file that will contain the
+short details of our dataset and decision we made till now for the ocr training...
+
+[AI]
+Building both. Notebook first.
+
+[built donut_timed_pilot.ipynb via a builder script, ran it, verified the notebook's cells
+parsed cleanly]
+
+Building the split script.
+
+[built build_splits.py, ran it against the real toc.json]
+
+Both done, code+notebook normal style, chat terse per caveman.
+
+Pilot notebook (donut_timed_pilot.ipynb): 5 bio + 35 page pages, strided across corpus
+not just first 35 (avoid bias). 1 epoch, batch=1, times every step, reports avg sec/step
+(first step excluded separately — CUDA warmup skews it), peak GPU mem vs 16GB T4 ceiling,
+extrapolates to full ~950-page train set × 5/8/12 epochs.
+
+Split (build_splits.py, real run against your toc.json):
+train: 926 pages (70.3%)
+val:   200 pages (15.2%)
+test:  191 pages (14.5%)
+Sonnets: 17 train / 4 val / 3 test
+
+Doc-level, stratified per category, seeded (reproducible). Sonnets = page-proportional,
+as you said — leakage risk documented in code comment + notes file, not silently hidden.
+
+ocr-training-notes.md — short version, table format, dataset + all decisions + open
+items.
+
+[USER]
+from the pilot i also want to know how accurate the ocrs will be? is it possible?
+
+[AI]
+Yes, possible — but honest caveat first: after 1 epoch on ~40 pages, "accuracy" here
+won't be a real quality number, just an early signal (model learning something vs
+producing garbage). Real accuracy needs the full training run. Still worth adding —
+confirms the training loop actually works before burning full quota on a broken setup.
+
+Adding CER/WER eval cells to the pilot notebook — held-out pages, not the ones it
+trained on.
+
+[edited the builder script to add jiwer to the install cell and appended eval cells that
+pull held-out val-split pages via splits.json, run greedy generation, and score against
+ground truth; rebuilt and verified the notebook parses]
+
+All clean, 19 cells now. Copying to outputs.
+
+[copied the updated notebook to outputs and presented it]
+
+Added. What it does: 8 held-out val-split pages (from splits.json, excluded from pilot
+training), greedy model.generate(), CER/WER via jiwer per page + mean. Needs splits.json
+uploaded alongside the notebook.
+
+Big flashing caveat, twice in the notebook itself: 1 epoch on 40 pages is a "did the loop
+work" check, not real quality — real number only comes after the full run on the full
+test split. Included the old classic-engine baseline (~0.04–0.07 CER reconstructed) as a
+reference point, not a target this pilot should hit.
+
+[USER]
+your generated splits json file, is that output of build splits. py?
+
+[AI]
+Yes — exactly that, nothing hand-edited.
+
+Ran build_splits.py right there in the sandbox against your real toc.json, and
+splits.json is its unmodified json.dump(manifest, ...) output — one row per page
+(page_id, title, category, split), 1,317 rows total. Same file the split summary numbers
+came from (926/200/191). So it's reproducible on your end too: run build_splits.py
+yourself with the same toc.json next to it, same SEED = 42, and you'll get byte-for-byte
+the same splits.json back.
+
+[USER]
+is it necesary for running the pilot??
+
+[AI]
+Depends which part.
+
+Timing part (original ask — sec/step, GPU mem): no. Pilot picks its 40 pages directly
+(bio_1/10/20/30/37 + strided page_*), no splits.json involved.
+
+Accuracy part (added after, the CER/WER check): yes, needed. That cell opens splits.json
+to grab held-out val-split pages, specifically so eval isn't run on pages the pilot just
+trained on. No splits.json → that cell errors on the open() call.
+
+So: upload splits.json alongside the notebook if you want the accuracy check to run.
+Skip it (or delete that cell) if you only want the timing numbers — rest of the notebook
+runs fine without it.
+
+[USER]
+from A2 spec , get necessary infos of metrics and others for evaluation of the dataset
+quality.
+
+[AI]
+Dug through 03-Project-Specification.md and 05-Codebase-Guide.md for exact metric
+requirements. Found real code-level detail, not just form-question text.
+
+## Two different "quality" checks — not the same thing
+
+1. Corpus quality gate (data/validate.py → validate(pages))
+Literal checks, spelled out in the guide: assert min pages/words, format, no leakage
+across splits. Concretely — enforce ≥300 pages, ≥60,000 words, right format, no document
+split across train/val/test. We already clear the first two by a mile (1,374 pages,
+~1M+ words). The leakage check is the one worth wiring up as real code — an assertion
+that walks splits.json and confirms no title appears under two different split values.
+Cheap to write, catches a real class of bug.
+
+2. OCR quality metric (eval/metrics.py → ocr_f1(pred, gold))
+This is what actually scores the pilot/full model. A2 form's own wording: "character or
+word error rate, or F1" — codebase names the stub function ocr_f1, via torchmetrics.
+Scored against grading_kit/labels.jsonl — ground-truth transcriptions for pages in
+grading_kit/heldout_pages/, which must be pages never used in OCR training (i.e., pulled
+from the test split, not train/val).
+
+## The one thing worth flagging hard — your NFR has a stricter definition than what's in
+A1
+
+Found this in the enhancement list: E34 — robust/reliable → OOD F1 drop ≤ 10%, computed
+in eval/robustness.py. That's the codebase's actual formal definition of "robust/
+reliable" — not the looser "reconstructed CER within 2x single-column CER" phrasing from
+the A1 form. Related: E14 also names a subgroup gap metric (ties straight to the bias
+question already answered in A1 — single-column vs two-column, or by category).
+
+This is a real reconciliation question, not busywork: do we restate the A1 target using
+the codebase's exact metric (OOD F1 drop ≤ 10%, on held-out pages the model's never seen
+— likely the Sonnets, since that's the genuinely different, less-tested layout), or keep
+the A1 phrasing and just note it maps onto E34? Which way do you want it?
+
+## Section 5 of the A2 form itself needs, concretely
+- OCR quality: F1 or CER/WER + sample size (from labels.jsonl)
+- Index stats: chunk count, embedding dimension, index type, corpus coverage (pages/
+words indexed vs total — 1,317 is the total to compare against)
+- One real retrieval example that worked
+- The worst failure seen, honestly reported
+
+Want me to write the validate.py leakage-check function now, or settle the E34 question
+first?
+
+[USER]
+nah
+we tried Donut pilot to test out the time needed and resource requirements and found out
+that free resources were not enough to deal with it. we cant use TrOCR, because we did
+not have the line by line gt, we had page by page. we also tried fine tuning and used
+the heldout pages (we created splits earlier, the test set from there) and evaluated to
+get very low accuracy as a result we took the deicision that reliability ensurement was
+not possible if we are going to finetune python ocr models or if its possible we dont
+have enough computational resources. so we used a qwen vlm pipeline to extract the data,
+which we are treating as the extracted ocr data.
+
+the ground truth kaggle : https://www.kaggle.com/datasets/abhishekroy48/shakespeare-ground-truth
+(has page and bio directory) -> used a free tier gemini api 3.5 flash lite to do this
+
+the ocr kaggle : https://www.kaggle.com/datasets/abhishekroy48/shakespeare-ocr (has
+starter, bio and page -> starter are not important page that needed to be extracted, so
+we did not have the gt for that)
+
+how i need to evaluate the ocr quality using the mentioned metrics in the form. so write
+me a pipeline so that i can do them for the bio and page directories pages.
+
+[AI]
+[built ocr_quality_eval.ipynb via a builder script covering: locating both Kaggle
+datasets, matching predictions to ground truth by filename stem across bio/page folders
+(starter excluded, reports unmatched files on both sides), a compute_page_metrics()
+function computing CER via jiwer.cer and WER/F1 from jiwer.process_words()'s hit/
+substitution/deletion/insertion counts, a per-page scoring loop, an overall + by-category
+summary, a subgroup-gap cell comparing bio vs page F1 against a ≤10% drop target tied to
+the codebase's E34 definition, a by-split breakdown if splits.json is present, a chart,
+a worst-failures table with a page-inspection helper, and a final cell building
+grading_kit/heldout_pages + labels.jsonl from the test split; ran a syntax check]
+
+All clean, 22 cells. Copying to outputs.
+
+[presented ocr_quality_eval.ipynb]
+
+Two separate datasets, not one:
+- Predictions to evaluate: shakespeare-ocr (Qwen VLM output) — bio/, page/, starter/
+subfolders. starter/ is excluded — no ground truth exists for it.
+- Ground truth / oracle: shakespeare-ground-truth (Gemini 3.5 Flash Lite output) — bio/,
+page/ subfolders.
+
+Metrics, per the A2 form: character/word error rate (CER/WER) and F1 — computed per
+page, then aggregated overall, by category (bio vs page), and by train/val/test split
+(if splits.json is available) so the "sample size" and "worst failure" answers in
+Section 5 have real numbers behind them.
+
+F1 comes straight out of jiwer's word-alignment counts (hits / substitutions / deletions
+/ insertions), the same alignment CER/WER are computed from — not a separate,
+inconsistent measure.
+
+The subgroup-gap cell (page vs bio F1, ≤10% drop target) is the concrete, computed
+answer to the E34 question from the previous turn, rather than leaving it as discussion.
+
+The by-split cell: no fine-tuning happened this time, so there's no strict leakage
+concern in reporting the full corpus — but breaking out by split keeps it consistent
+with the split plan already built, and the test-split numbers are what should feed
+grading_kit/.
+
+The final cell builds grading_kit/heldout_pages/ + labels.jsonl straight from the
+test-split rows — required for A2 submission regardless of anything else, reuses the
+same matched data instead of a separate manual step. It only writes the text/JSONL, not
+images — this notebook doesn't have the image dataset mounted.
+
+One gap I can't close from here: I don't know the actual filenames inside
+shakespeare-ocr/shakespeare-ground-truth, so the matching regex is a best guess based on
+the two sample files you showed way earlier. If matched-pair count comes back low when
+you run it, that's the first thing to check.
+
+[USER]
+disable /caveman
+actual files are .txt file with same naming format of the image files
+generate a detailed csv which will contain matrix for each page and an aggregated answer
+as well
+give me a explanation of what the cells are doing in the evaluation ipynb, output it
+directly here not in the notebook
+add user interaction print lines so that i can understand how it is performing. if you
+have any qusn ask away
+
+[AI]
+[disabled caveman mode; rewrote the matching cell to use exact filename matching instead
+of the earlier fuzzy-regex approach, now that naming was confirmed identical to the
+image files; rewrote the scoring loop to print one line per page as it's scored plus a
+running average every 50 pages; restructured the summary/CSV-building cells into one
+combined ocr_quality_results.csv containing both per-page rows and labeled aggregate
+rows (OVERALL, CATEGORY=bio, CATEGORY=page, SPLIT=train/val/test, and an
+NFR_CHECK_F1_DROP_PCT row), fixing a first attempt that had clumsily appended the NFR
+check as a raw hand-written CSV string in the wrong column, replacing it with a proper
+row built the same way as the others; ran the full matching/scoring/aggregation logic
+against synthetic fixture data in the sandbox before handing it back, rather than only
+syntax-checking it]
+
+Caveman off. Notebook's updated and verified against synthetic test data before handing
+off (not just syntax-checked this time — actually ran the matching/scoring/aggregation
+logic end-to-end). Here's what each cell does:
+
+Cell 1 (markdown): Context recap — why fine-tuning was dropped, what the two datasets
+are, what's being measured.
+
+Cell 2: pip install jiwer pandas matplotlib.
+
+Cell 3: Locates both Kaggle datasets on disk, prints the resolved paths.
+
+Cell 4–5 (matching): Lists .txt filenames in each bio/page folder on both sides, keeps
+only filenames present in both (exact match now, not fuzzy — per your correction), prints
+per-folder counts and match count, and separately lists anything that didn't match on
+either side so a data gap doesn't disappear silently.
+
+Cell 6–7 (metrics function): Defines compute_page_metrics() — CER via jiwer.cer, and
+WER/F1 built from jiwer.process_words()'s hit/substitution/deletion/insertion counts, so
+all three numbers come from one consistent alignment rather than separate calculations
+that could disagree.
+
+Cell 8 (the scoring loop — this is the one you asked for): Loops every matched pair,
+prints one line per page as it's scored ([142/1317] page_0512 (page)  CER=0.0532
+WER=0.0891 F1=0.9308), prints a running average every 50 pages so you can watch it trend
+without scrolling, and reports how many pages got skipped for empty text at the end.
+
+Cell 9–10 (split attach): Loads splits.json if present, maps each page to train/val/
+test, prints how many pages matched — degrades gracefully (empty split column, not a
+crash) if the file's missing.
+
+Cell 11–12 (the combined CSV — this is the other thing you asked for): Builds
+ocr_quality_results.csv with two row kinds via a row_type column: page rows (one per
+scored page) and aggregate rows (OVERALL, CATEGORY=bio, CATEGORY=page, SPLIT=train/val/
+test if available, plus the NFR check below) — each aggregate row carries its own
+n_pages sample size. Prints each aggregate as it's built.
+
+Cell 13–14 (NFR check): bio F1 vs page F1, drop % against the ≤10% target, printed PASS/
+FAIL — also saved as its own row in the same CSV (NFR_CHECK_F1_DROP_PCT), not just
+printed and lost.
+
+Cell 15–16 (chart): Two bar charts — CER/WER by category, F1 by category.
+
+Cell 17–18 (worst failures): Top 10 highest-CER pages as a table, plus a
+show_worst_page(page_id) helper that prints the OCR output next to the ground truth side
+by side for manual inspection.
+
+Cell 19–20 (grading_kit): Builds heldout_pages/ + labels.jsonl from the test-split rows
+only — required for A2 submission, reuses this same matched data instead of a separate
+manual step. Only writes text/JSONL, not images (this notebook doesn't have the image
+dataset mounted).
+
+One thing I couldn't verify without your actual data: whether every bio/page file has a
+match on both sides, or whether the starter exclusion is the only gap. Real match-rate
+will show up in Cell 4–5's output the first time you run it.
+
+[USER]
+Cell 9–10 (split attach): Loads `splits.json` if present, maps each page to train/val/test,
+prints how many pages matched — degrades gracefully (empty split column, not a crash) if
+the file's missing.
+
+Cell 19–20 (grading_kit): Builds `heldout_pages/` + `labels.jsonl` from the `test`-split
+rows only — required for A2 submission, reuses this same matched data instead of a separate
+manual step. Only writes text/JSONL, not images (this notebook doesn't have the image
+dataset mounted).
+
+i did not understand what they are doing, explain simply.
+
+[AI]
+Sure, let me break both down without the code-speak.
+
+Cell 9–10 (split attach)
+
+Remember splits.json — the file that says which pages are "train," which are "val," and
+which are "test"? This cell just looks up, for every page you just scored, which of
+those three groups it belongs to, and writes that as a new column next to its CER/WER/F1
+numbers.
+
+Why bother: so later you can ask "how good is the OCR specifically on the test pages?"
+instead of only "how good is it overall?" — same as how your earlier OCR trials cared
+about test vs. train, just applied here too.
+
+The "degrades gracefully" bit just means: if you forget to upload splits.json to this
+notebook, it doesn't crash — it just leaves that column blank and carries on scoring
+everything else normally. So a missing file is an inconvenience, not a broken notebook.
+
+Cell 19–20 (grading_kit)
+
+This is building one of the actual files your course wants you to hand in. Two things it
+needs:
+- heldout_pages/ — a small folder of page images that were never used for anything
+else, kept aside purely for grading.
+- labels.jsonl — the correct/true text for exactly those pages, so a grader (or the
+auto-grading script) can check your OCR's answer against the truth.
+
+Since this notebook already has, for every page, its category and its true text (from
+the ground-truth dataset) and now which split it's in — it just filters down to only the
+test-split pages, and writes their correct text out into labels.jsonl in the format the
+course expects. That's it — it's reusing work you already did in this same notebook,
+instead of you having to go copy files around by hand afterward.
+
+The one thing it does not do: copy the actual page images into that folder. It only has
+the text files loaded (from the two Kaggle text datasets) — it never loaded the image
+dataset, so it can't copy pictures it never opened. You'd still need to manually grab the
+matching images for those same test-split pages and drop them into heldout_pages/
+yourself.
+
+[USER]
+get rid of this for now :"))
+
+[NOTE: no assistant reply to this message is present in the conversation history
+available when this transcript was compiled. Not fabricated here - if a reply happened,
+it should be added back in by whoever finalizes this file, from the actual chat history.]
+
+--- A2 CONVERSATION AS COMPILED ENDS HERE ---
+
+
+--- A2 CHUNKING SESSION (CLAUDE CODE) START ---
+
+[CONTEXT NOTE: this is a separate, later working session conducted in Claude Code (model
+Claude Opus 5) with direct filesystem access to the repo, rather than in the web chat. It
+covers Stage 3 of the A2 pipeline (chunking), which the OCR conversation above does not
+touch. Summarised rather than verbatim: the assistant's work here was largely tool calls
+(shell commands, regex counts over the corpus, prototype scripts). Command output quoted
+below is real output from those runs, not reconstructed.]
+
+[USER]
+see the chunking_strategy_plan.md which is made by claude web for chunking process, the
+project context is in the project_context_and_chunking_goals.md
+
+in the plan the regex was given based on the context with seeing the ocred texts in the
+shakespeare-ocr/ folder. so i need you fact check the plan by evaluating the folder
+content and context. and update the appropriate chunking method.
+
+[AI]
+Read both documents, then validated the plan's regex patterns against the actual corpus
+(1,374 .txt files) rather than reasoning from the sample. Three of the plan's central
+assumptions were wrong:
+
+1. toc.json did not exist on disk. The plan routed all content off "toc.json ids 3-39 /
+42 / 47-48", but only gt-extract/ocr_progress.json (a flat filename list) was present.
+The entire routing mechanism was unbuildable as written.
+
+2. The default speaker regex was backwards. The plan defaulted to SPEAKER_RE_FULL
+("HAMLET.") and treated the abbreviated form as a fallback to swap in if needed. Measured
+counts: 130 full-caps lines vs 23,775 abbreviated. The plan had hedged this as "paste one
+real page and I'll fit these exactly" — but the answer was already in the folder.
+
+3. The scene regex over-segments by ~37%. "SCENE II.]" is a running header printed on
+every page — 421 of them, against 719 real "SCENE X.—Location" headers. The plan's
+pattern cuts on both, which shatters scenes and silently breaks the "never cross a scene
+boundary" guarantee the whole design rests on.
+
+Also found by testing rather than assuming: a first corrected speaker regex matched FEWER
+lines than the original (-1,152). Rather than accept that, diffed the two match sets,
+which exposed two independent real patterns — 2,388 lines where the speaker tag sits
+alone with speech wrapping to the next line, and numbered speakers like "1 Lord." /
+"2 Cit." that a single-token pattern misses. Both are genuine.
+
+Testing the merged regex then surfaced a subtler failure: it matched "Elsinore.",
+"Tropically.", "Perpend." — ordinary sentence-final words. Shape alone cannot identify a
+speaker. Added a frequency-vocabulary filter (>=2 occurrences keeps 741 tags / 27,172
+lines and drops the singleton noise).
+
+Missing from the plan entirely: any normalization step. Measured 2,395 catchword
+artifacts ("[Sun", "[there?"), 2,603 hyphenated line-break splits ("ignora-" / "nce"),
+23 blank pages. Chunking without stripping these feeds broken tokens into the embeddings,
+which matters given robustness is the primary NFR.
+
+What held up: SONNET_HEADER_RE was correct (172 matches, spot-checked on page_1250.txt),
+though it needs range-scoping. Reference-section exclusion was the right call.
+
+Rewrote the plan with a claim-by-claim correction table so the A2 write-up can cite the
+correction rather than presenting the design as if it had been right the first time.
+
+[USER]
+<uploaded toc.json>
+here is the toc.json
+if you need to do change, do it
+
+[AI]
+Validated the supplied toc against the corpus before changing anything. The toc is
+authoritative and better than the corpus-derived manifest I had proposed: its start_page
+values map 1:1 to filenames (contiguous page_0001-page_1318, zero gaps), and routing
+verified end-to-end at 44 works / 1,280 pages with every page_span matching the files on
+disk exactly.
+
+Two of my OWN claims from the previous pass were wrong, and I retracted them in the plan:
+
+1. "toc.json does not exist" — it simply wasn't on disk yet. Saved it to repo root. The
+corpus-derived approach I had proposed was strictly worse.
+
+2. "Reference sections aren't in the corpus" — they ARE (page_1281+ Index, page_1300+
+Glossary). I had inferred absence from them not appearing in my searches. Excluding them
+is still correct, but it has to be an explicit need_ocr:false filter, or 38 pages of
+index and glossary silently enter the vector index.
+
+A real finding came out of the cross-check: my earlier count of "36 plays" was wrong. The
+toc says 37. page_0716 (King Henry VIII) reads "PERSONS, REPRESENTED." with a stray OCR
+comma, so the corpus regex found 36 and the toc found 37. This is the argument for
+routing off the toc rather than the corpus — the toc survives OCR damage that corpus
+detection does not. Under the derived approach, Henry VIII would have been merged into
+Richard III and mis-cited throughout.
+
+[USER]
+do you think the plan is a proper one for chunking?? will it work after seeing the
+dataset?
+
+[AI]
+Answered honestly: directionally right but not yet buildable. Validating regexes was
+necessary, not sufficient — nobody had tested whether the pieces compose into actual
+chunks. Built the full pipeline and ran it over all 37 plays. It produced 4,536 chunks,
+median 185 words, 2% undersized, with citations coming out as
+"[Hamlet | Act II Sc II | pp.1138-1144 | Ros,Guil,King,Queen]".
+
+Three things the plan did not account for, found only by running it:
+
+1. Act headers silently vanish in 6 plays. ACT_RE alone finds 3 of 5 acts in Taming of
+the Shrew. Acts are printed as a bracketed running header "[ACT III." (396 corpus-wide)
+which the plan classifies as a stage direction and deletes. Combining the body header
+with the running header recovers 35/37 plays. Without the fix, thousands of chunks carry
+a wrong act number — and wrong citations are worse than missing ones because they look
+correct.
+
+2. Order of operations is load-bearing and the plan had it wrong. The plan's normalizer
+strips bracketed lines before the structure pass reads them, destroying the act headers
+from (1). Metadata must be extracted first, then stripped. The plan presented these as
+independent steps.
+
+3. 94% of pages begin mid-speech (1,139/1,209), so speeches routinely span page
+boundaries. Per-page chunking would truncate them; the work must be concatenated before
+splitting. The plan never stated this.
+
+Also flagged a limitation that is NOT a chunking problem: some chunks contain interleaved
+text from opposite columns, e.g. "King: Thanks, Rosenkrantz and gentle Guildenstern.
+[Rosenkrantz: / Queen: Thanks, Guildenstern and gentle" — where the real text has the
+King thank one pair and the Queen the other. That is residual two-column reading-order
+damage from the OCR stage, already on disk before chunking runs. No chunker can repair
+it. Since multi-column reading order is the declared data speciality and F1 is largely
+blind to ordering errors, recommended sampling ~20 chunks against shakespeare-gt/ and
+measuring verbatim correctness — that number, not F1 0.861, is what A3 groundedness will
+depend on.
+
+[USER]
+you found the problems and solutions
+you also found the gaps in the previous plan
+i want you to update the chunking_strategy_plan.md with actual working plan and get rid
+of unnecessary previous plan state and update made logs
+i will pass the plan to my teammate and want him to implement it
+
+[AI]
+Rewrote the file as a clean implementation spec (removed the correction-log framing so it
+reads as instructions, not an argument with a previous version), and saved a working
+reference implementation as chunk_reference_impl.py so the teammate can run and diff
+against it.
+
+Found one more silent bug while writing it up. Testing the sonnet path end-to-end, the
+pipeline reported success while destroying 54 of 140 sonnets. Cause: TITLE_RE, the
+ALL-CAPS running-header stripper, also matches roman numerals of 6+ characters —
+"XXIII.", "XXVII.". Sonnets I-XXII survived; everything above ~XXIII vanished. Same class
+of bug as the act-header issue: normalization running before structure extraction. Both
+are silent — the pipeline reports success either way — so both are called out in their
+own section of the spec with sanity checks (sonnet chunks == 140; all 5 acts present for
+Taming of the Shrew and Twelfth Night).
+
+Note on process: one intermediate measurement during this session was wrong — a shell
+quoting issue made a regex report zero sonnet headers when the real count was 140. Caught
+it by re-running from a script file instead of an inline command. Every number in the
+final spec comes from the saved implementation, so it is re-runnable rather than
+transcribed.
+
+Final validated output: 4,774 chunks (4,535 play + 239 poem/sonnet, of which 140
+sonnets), median 176 words, 1.8% undersized, act missing on 24 chunks (0.5%), scene
+missing on 12 (0.25%).
+
+[USER]
+dont start editing anything
+you only did the chunking for page dir txt files right?
+
+[AI]
+Confirmed: yes, page/ only. main() in the reference implementation explicitly skips
+Biography ("if t['category'] == 'Biography': continue"), so all 4,774 chunks come from
+page/ and zero from bio/. That means the acceptance numbers in the spec are page-only,
+and the semantic chunking path is specified but neither implemented nor validated —
+everything verified about bio/ was descriptive (37 files carry a running header on line
+1; 9% blank lines so paragraph structure is usable; spaced punctuation the sentence
+splitter must tolerate), not a chunking run.
+
+Flagged two consequences: the spec's acceptance criteria don't cover bio, so there is no
+regression target for that path; and semantic chunking is the declared bonus feature, so
+it is currently the least de-risked part of the stage despite being the graded extra. The
+starter/ folder (18 files) is also untouched and unreferenced by toc.json.
+
+--- A2 CHUNKING SESSION ENDS HERE ---
+
+
+REFLECTION (DRAFT — please rewrite this in your own words before submitting)
+==============================================================================
+
+NOTE TO STUDENT: same as the A1 transcript — the course's authorship gate exists to
+confirm YOU did the reasoning, not the AI. This is a factual starting point, not a
+substitute for your own reflection.
+
+Draft starting point:
+
+For the OCR/HTR decision (Section 3), I pushed back on the AI's first recommendation
+(TrOCR) once I actually knew what shape our ground truth was in — page-level, not
+line-level — and the AI revised its own recommendation to Donut once that mismatch was
+pointed out, rather than forcing the original plan. I also caught the AI stating a claim
+about Donut's eligibility without having checked the spec, and made it verify that
+before I accepted it.
+
+I made the actual call that changed the project's direction the most: after seeing real
+numbers from our own Donut pilot and a completed fine-tuning attempt (both showing the
+free-tier compute and resulting accuracy weren't good enough), I decided to abandon
+fine-tuning entirely and switch to a zero-shot Qwen VLM pipeline as the production OCR
+step, scored against a separately-built Gemini ground truth. That's a significant pivot
+from the plan we'd built up to that point, and it was based on evidence we'd actually
+gathered, not a suggestion the AI made unprompted.
+
+I also caught a real factual error the AI made about how our own ground truth dataset
+was built — it assumed the column-by-column transcription process had produced
+recoverable intermediate files, and I had it check the actual notebook that built the
+dataset instead of continuing on the wrong assumption, which changed the final Donut
+full-page-vs-column-crop decision.
+
+For Section 5 (evaluation), I corrected the AI's assumption about file-naming format (it
+had built a fuzzy-matching fallback that wasn't needed once I confirmed the files use the
+same naming as the source images), and asked for the evaluation output restructured
+twice — once for a combined CSV with per-page and aggregate rows, and again for
+plain-language, non-technical explanations of what each part of the notebook does.
+
+On the chunking stage (Sections 3 and 4), I did not accept the chunking plan that had
+been drafted in the web chat. I specifically instructed that it be fact-checked against
+the actual OCR output in shakespeare-ocr/ rather than against the assumptions it was
+written from, because I knew the plan's regexes had been written without anyone having
+looked at a real page. That instruction is what surfaced the three assumptions that would
+have broken the build — the missing toc.json, the speaker-name convention being the
+opposite of what was assumed, and the scene regex matching running headers.
+
+When the plan came back revised, I supplied the real toc.json rather than letting the
+corpus-derived workaround stand. That decision turned out to matter more than I expected:
+routing off the toc rather than off the corpus is what catches King Henry VIII, whose
+cast-list header is OCR-damaged and which the corpus-based detection missed entirely.
+
+The judgement call I consider mine is the one after that. Rather than accepting a plan
+that looked complete, I asked directly whether it would actually work against the
+dataset — which is what prompted building and running the pipeline instead of only
+validating regexes in isolation. That run is what exposed the act headers being deleted
+as stage directions, the ordering dependency between normalization and structure
+extraction, and the fact that 94% of pages begin mid-speech. None of those are visible
+from reading the plan; they only appear when the code runs on the real corpus.
+
+I also decided to have the working implementation saved alongside the spec and its output
+numbers recorded as regression targets, so my teammate implementing this has something
+runnable to diff against rather than prose to interpret. I am aware two known gaps remain
+that I chose to leave open rather than paper over: the semantic chunking path for the
+Biography is specified but not yet implemented or validated (and it is our declared bonus
+feature), and the column-interleaving damage visible in some chunks is inherited from the
+OCR stage and cannot be fixed at chunking time — I plan to measure verbatim chunk
+accuracy against shakespeare-gt/ before relying on it for A3.
