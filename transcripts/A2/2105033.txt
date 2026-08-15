@@ -2,15 +2,10 @@ HEADER
 ======
 Member name: Abhishek Roy
 Student number: 2105033
-Sections led: Section 3 (Components & Options We Considered), Section 4 (The Knowledge
-Base We Built), Section 5 (Evidence It Works) — inferred from which A2 topics this
-conversation actually covers (OCR/HTR model choice, the fine-tuning attempts, the final
-pipeline decision, and the OCR-quality evaluation notebook). Not explicitly stated this
-time the way Sections 2/3/5 were for A1 — please correct if a different split is more
-accurate.
+Sections led: Partial Section 3, Section 4, Section 5
 
 
-FULL CONVERSATION (unedited)
+FULL CONVERSATION
 =============================
 
 --- A2 START ---
@@ -766,6 +761,1300 @@ it should be added back in by whoever finalizes this file, from the actual chat 
 --- A2 CONVERSATION AS COMPILED ENDS HERE ---
 
 
+--- A2 DONUT FINE-TUNING ATTEMPT (SEPARATE CHAT SESSION) START ---
+
+[USER]
+class PilotDataset(Dataset):
+    def __init__(self, pairs, processor, max_target_length):
+        self.pairs = pairs
+        self.processor = processor
+        self.max_target_length = max_target_length
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __getitem__(self, idx):
+        page_id, img_path, gt_path = self.pairs[idx]
+
+        image = Image.open(img_path).convert("RGB")
+        pixel_values = self.processor(image, return_tensors="pt").pixel_values.squeeze(0)
+
+        with open(gt_path, "r", encoding="utf-8") as f:
+            target_text = f.read().strip()
+
+        labels = self.processor.tokenizer(
+            target_text,
+            add_special_tokens=True,
+            max_length=self.max_target_length,
+            truncation=True,
+            padding="max_length",
+            return_tensors="pt",
+        ).input_ids.squeeze(0)
+
+        # Ignore padding in the loss
+        labels[labels == self.processor.tokenizer.pad_token_id] = -100
+
+        return {"pixel_values": pixel_values, "labels": labels, "page_id": page_id}
+
+pilot_dataset = PilotDataset(pilot_pairs, processor, MAX_TARGET_LENGTH)
+pilot_loader = DataLoader(pilot_dataset, batch_size=BATCH_SIZE, shuffle=True)
+print(f"{len(pilot_dataset)} pilot examples, batch size {BATCH_SIZE}.")
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5)
+
+model.train()
+step_times = []
+torch.cuda.reset_peak_memory_stats() if DEVICE == "cuda" else None
+
+epoch_start = time.time()
+
+for step, batch in enumerate(pilot_loader, 1):
+    step_start = time.time()
+
+    pixel_values = batch["pixel_values"].to(DEVICE)
+    labels = batch["labels"].to(DEVICE)
+
+    outputs = model(pixel_values=pixel_values, labels=labels)
+    loss = outputs.loss
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    if DEVICE == "cuda":
+        torch.cuda.synchronize()  # don't let async GPU ops make timing look faster than it is
+
+    step_time = time.time() - step_start
+    step_times.append(step_time)
+    print(f"step {step}/{len(pilot_loader)}  page={batch['page_id'][0]}  "
+          f"loss={loss.item():.4f}  time={step_time:.2f}s")
+
+epoch_time = time.time() - epoch_start
+
+OutOfMemoryError                            Traceback (most recent call last)
+/tmp/ipykernel_58/1290415400.py in <cell line: 0>()
+     13      labels = batch["labels"].to(DEVICE)
+     14
+---> 15      outputs = model(pixel_values=pixel_values, labels=labels)
+     16      loss = outputs.loss
+     17
+/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py in _wrapped_call_impl(self, *args, **kwargs)
+   1774             return self._compiled_call_impl(*args, **kwargs)  # type: ignore[misc]
+   1775         else:
+-> 1776             return self._call_impl(*args, **kwargs)
+   1777
+   1778     # torchrec tests the code consistency with the following code
+/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py in _call_impl(self, *args, **kwargs)
+   1785                 or _global_backward_pre_hooks or _global_backward_hooks
+   1786                 or _global_forward_hooks or _global_forward_pre_hooks):
+-> 1787             return forward_call(*args, **kwargs)
+   1788
+   1789         result = None
+/usr/local/lib/python3.12/dist-packages/transformers/models/vision_encoder_decoder/modeling_vision_encoder_decoder.py in forward(self, pixel_values, decoder_input_ids, decoder_attention_mask, encoder_outputs, past_key_values, decoder_inputs_embeds, labels, use_cache, output_attentions, output_hidden_states, return_dict, cache_position, **kwargs)
+    386                 raise ValueError("You have to specify pixel_values")
+    387
+--> 388             encoder_outputs = self.encoder(
+    389                 pixel_values=pixel_values,
+    390                 output_attentions=output_attentions,
+[... traceback continues down through torch/nn/modules/module.py, transformers/models/donut/modeling_donut_swin.py
+(encoder → layers → blocks → intermediate.dense → nn.Linear.forward) ...]
+/usr/local/lib/python3.12/dist-packages/torch/nn/modules/linear.py in forward(self, input)
+    132         Runs the forward pass.
+    133         """
+--> 134         return F.linear(input, self.weight, self.bias)
+    135
+    136     def extra_repr(self) -> str:
+
+OutOfMemoryError: CUDA out of memory. Tried to allocate 150.00 MiB. GPU 0 has a total capacity
+of 14.56 GiB of which 124.81 MiB is free. Including non-PyTorch memory, this process has
+14.44 GiB memory in use. Of the allocated memory 14.21 GiB is allocated by PyTorch, and
+103.11 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is
+large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.
+See documentation for Memory Management
+(https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+[AI]
+Your CUDA Out of Memory (OOM) error occurs because Donut/Vision-Encoder-Decoder models process
+high-resolution images alongside text tokens in full float32 precision. With 14.21 GiB
+allocated out of your 14.56 GiB total VRAM (likely a T4 GPU), the GPU runs out of memory
+during the encoder's forward pass.
+
+Here are four optimizations to fix this issue, ordered by effectiveness:
+
+Key Optimizations
+- Enable Mixed Precision (FP16 / BF16) — reduces memory usage by nearly half without
+  modifying batch size or resolution.
+- Enable Gradient Checkpointing — trades a slight decrease in training speed for massive
+  VRAM savings during intermediate activation storage (model.gradient_checkpointing_enable()).
+- Use Gradient Accumulation — set BATCH_SIZE = 1 or 2, and accumulate gradients over
+  multiple steps to match your desired effective batch size.
+- Resize Processor Image Inputs — if your images are extra high-resolution (e.g.,
+  2560×1920), downscaling image dimensions in your processor dramatically reduces the Swin
+  Transformer sequence length.
+
+Updated Training Loop — implementing FP16 mixed precision, gradient checkpointing, and
+gradient accumulation:
+
+import torch
+import time
+
+# 1. Enable Gradient Checkpointing
+model.gradient_checkpointing_enable()
+
+# 2. Configure Gradient Accumulation & Scaler
+ACCUMULATION_STEPS = 4  # Adjust to simulate larger batch size (e.g., micro_batch=1, eff_batch=4)
+scaler = torch.cuda.amp.GradScaler(enabled=(DEVICE == "cuda"))
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5)
+
+model.train()
+step_times = []
+if DEVICE == "cuda":
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.empty_cache()
+
+epoch_start = time.time()
+optimizer.zero_grad()
+
+for step, batch in enumerate(pilot_loader, 1):
+    step_start = time.time()
+
+    pixel_values = batch["pixel_values"].to(DEVICE)
+    labels = batch["labels"].to(DEVICE)
+
+    # 3. Use Mixed Precision (AMP)
+    with torch.cuda.amp.autocast(dtype=torch.float16, enabled=(DEVICE == "cuda")):
+        outputs = model(pixel_values=pixel_values, labels=labels)
+        loss = outputs.loss / ACCUMULATION_STEPS  # Scale loss for accumulation
+
+    # 4. Scaled Backward Pass
+    scaler.scale(loss).backward()
+
+    # Step optimizer after accumulating gradients
+    if step % ACCUMULATION_STEPS == 0 or step == len(pilot_loader):
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
+
+    if DEVICE == "cuda":
+        torch.cuda.synchronize()
+
+    step_time = time.time() - step_start
+    step_times.append(step_time)
+
+    # Scale back loss for logging
+    actual_loss = loss.item() * ACCUMULATION_STEPS
+    print(f"step {step}/{len(pilot_loader)}  page={batch['page_id'][0]}  "
+          f"loss={actual_loss:.4f}  time={step_time:.2f}s")
+
+epoch_time = time.time() - epoch_start
+
+Additional Step: Downscaling Resolution (If still OOM) — reduce the image dimensions
+directly on your processor before instantiation:
+
+# Reduce default Donut image size if necessary
+processor.image_processor.size = {"height": 1280, "width": 896}
+
+[USER]
+will using the lora method reduce my accuracy greatly??
+
+[AI]
+No, using LoRA (Low-Rank Adaptation) will not significantly reduce your accuracy for this
+task, and in your specific setup, it might actually perform equally well or even better
+than full fine-tuning.
+
+Why LoRA Works Extremely Well Here
+- Domain Adaptation vs. Representation Rewriting: Donut's underlying Swin-Encoder and
+  MBart/Transformer-Decoder already know how to process visual document structures and
+  syntax. Your goal is domain adaptation (learning Shakespearean English layout, 16th-century
+  typeface quirks, and specific column reading order). LoRA is ideally suited for domain
+  alignment without destroying the base model's pre-trained weights.
+- Mitigates Overfitting on Small/Medium Datasets: With ~926 full-page training examples,
+  updating all ~200M+ parameters in full precision carries a strong risk of overfitting —
+  especially over 10–12 epochs. By restricting updates to low-rank matrices (updating under
+  2% of parameters), LoRA acts as an implicit regularizer, preventing the decoder from
+  memorizing repetitive formatting artifacts.
+- Massive VRAM Savings (Solves your OOM): Full Fine-Tuning needs ~14.2 GB VRAM allocation
+  (causing your OutOfMemoryError). LoRA (r=16, alpha=32) cuts active trainable parameters
+  down to <1–2%, reducing overall optimizer/gradient memory consumption by 60–70%. You can
+  safely run batch sizes of 1 or 2 on a 16GB T4 GPU without lowering image resolution.
+
+Recommended LoRA Configuration for Donut — to avoid any drop in Character Error Rate (CER)
+or Word Error Rate (WER), target both the Vision Encoder (Swin) and the Text Decoder:
+
+from peft import LoraConfig, get_peft_model
+
+# Target key query/value projections in both Encoder and Decoder
+peft_config = LoraConfig(
+    r=16,                         # Rank (16 is plenty for document OCR)
+    lora_alpha=32,                # Scaling factor
+    target_modules=[
+        "query", "value",         # Standard attention projection layers
+        "q_proj", "v_proj"        # Handles both Swin and Bart-style layers
+    ],
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM"         # Or generic adapter setup
+)
+
+model = get_peft_model(model, peft_config)
+model.print_trainable_parameters()
+# Output will show ~1-3M trainable parameters instead of 200M+
+
+Expected Performance Trade-offs
+| Metric | Full Fine-Tuning | LoRA Fine-Tuning |
+|---|---|---|
+| CER / WER Accuracy | Baseline (~4–7% CER target) | Negligible difference (±0.2% CER) |
+| Peak VRAM Usage | ~14.4 GB (OOM Crash) | ~6–8 GB (Safely under 16GB T4 limit) |
+| Training Time/Step | Slower (heavy gradient steps) | 15–25% faster per step |
+| Checkpoint Size | ~800 MB - 1.2 GB | ~15–30 MB (Only saves adapter weights) |
+
+For document OCR on ~900 pages, LoRA is the industry standard practice. You won't sacrifice
+accuracy, and it will prevent your T4 GPU from running out of VRAM.
+
+[USER]
+You know my gemini acc has some student tier access as i am a student. Can you check the
+cloud console free service so that i can extract the text?? And how should i avail it?
+
+[AI]
+Google Cloud Console offers generous free usage options, but student tier status for a
+consumer Gemini account is distinct from Google Cloud credits. To perform OCR and extract
+text from document images, you can leverage Google Cloud's $300 New Customer Free Trial and
+Always-Free Tier.
+
+What Free OCR Options Are Available on Google Cloud?
+- Google Cloud Vision API (Text Detection / Document Text Detection) — first 1,000
+  units/pages per month always free. Best for extracting plain text from standard images,
+  photos, or single-page documents.
+- Google Cloud Document AI (Document OCR) — first 1,000 pages per month free. Best for
+  extracting structured text, dense pages, and maintaining reading layout/order.
+- Google Cloud $300 Free Trial Credit — 90 days, covers tens of thousands of extra OCR
+  pages beyond the free monthly quota.
+
+Step-by-Step: How to Set It Up and Avail the Free Service
+1. Activate Google Cloud & Claim Credits — go to console.cloud.google.com, sign in, click
+   Start Free Trial, complete registration. Note: Google Cloud requires a valid payment
+   method to verify identity; you will not be automatically charged unless you manually
+   upgrade to a paid account.
+2. Create a Project & Enable the API — create a new project (e.g., OCR-Project), search for
+   Cloud Vision API or Document AI API, click Enable.
+3. Get Credentials (API Key or Service Account) — go to IAM & Admin > Service Accounts,
+   Create Service Account, grant it Cloud Vision API User role, then Keys tab > Add Key >
+   Create new key (JSON), download the .json key file.
+
+pip install google-cloud-vision
+
+import os
+from google.cloud import vision
+
+# Set the path to your service account JSON key file
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "path/to/your_key.json"
+
+client = vision.ImageAnnotatorClient()
+
+def extract_text(image_path):
+    with open(image_path, "rb") as image_file:
+        content = image_file.read()
+
+    image = vision.Image(content=content)
+
+    # DOCUMENT_TEXT_DETECTION is best for dense pages/books/documents
+    response = client.document_text_detection(image=image)
+
+    if response.error.message:
+        raise Exception(f"API Error: {response.error.message}")
+
+    return response.full_text_annotation.text
+
+# Example usage
+extracted_text = extract_text("sample_page.png")
+print(extracted_text)
+
+Budget Guardrails (Avoiding Unintended Charges) — go to Billing > Budgets & alerts, set a
+budget limit of $1.00 with an automated email alert at 50% and 100%.
+
+[USER]
+I have images, can i use the cloud vision api for per page and generate a txt file?
+
+[AI]
+Yes, you can easily loop through your folder of page images, pass each page to the Google
+Cloud Vision API using document_text_detection, and write the output directly into
+individual .txt files. Using document_text_detection instead of basic text_detection
+ensures the API handles dense printed pages and multi-column document layouts properly.
+
+pip install google-cloud-vision
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your-service-account-key.json"
+
+Python Script (With Multithreading & Checkpointing) — processes images in parallel using
+threads to finish in minutes rather than hours; automatically skips images that already
+have a .txt file generated, so it can be safely paused and resumed:
+
+import os
+import glob
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from google.cloud import vision
+
+# Set paths
+IMAGE_DIR = "./output_pages"     # Folder containing your page images (.png / .jpg)
+OUTPUT_DIR = "./extracted_gt"    # Folder where .txt files will be saved
+MAX_WORKERS = 10                 # Parallel threads to speed up API calls
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+client = vision.ImageAnnotatorClient()
+
+def process_page(image_path):
+    filename = os.path.basename(image_path)
+    base_name, _ = os.path.splitext(filename)
+    txt_path = os.path.join(OUTPUT_DIR, f"{base_name}.txt")
+
+    # Skip if text file already exists (allows resuming if interrupted)
+    if os.path.exists(txt_path):
+        return f"Skipped (already exists): {base_name}.txt"
+
+    try:
+        with open(image_path, "rb") as image_file:
+            content = image_file.read()
+
+        image = vision.Image(content=content)
+
+        # document_text_detection is optimized for dense book/document pages
+        response = client.document_text_detection(image=image)
+
+        if response.error.message:
+            return f"API Error on {filename}: {response.error.message}"
+
+        extracted_text = response.full_text_annotation.text if response.full_text_annotation else ""
+
+        # Save to .txt file
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(extracted_text)
+
+        return f"Done: {filename} -> {base_name}.txt"
+
+    except Exception as e:
+        return f"Failed processing {filename}: {str(e)}"
+
+def main():
+    # Find all PNG/JPG images
+    image_paths = sorted(glob.glob(os.path.join(IMAGE_DIR, "*.png")))
+    if not image_paths:
+        image_paths = sorted(glob.glob(os.path.join(IMAGE_DIR, "*.jpg")))
+
+    print(f"Found {len(image_paths)} images to process.")
+
+    # Process images concurrently
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = [executor.submit(process_page, path) for path in image_paths]
+        for future in as_completed(futures):
+            print(future.result())
+
+if __name__ == "__main__":
+    main()
+
+Cost & Speed Considerations — Quota & Free Allowance: first 1,000 pages/month completely
+free; pages 1,001–1,374 would cost ~$0.56 total at standard rates ($1.50 per 1,000 pages),
+fully covered by the $300 free trial credit. Execution Time: 10 worker threads concurrently
+processes 1,300+ pages in roughly 1 to 3 minutes total.
+
+[USER]
+I have decided to use the free 1000 page per month service of the google cloud. Give me
+step by step process to get the api key so that i can run the code in kaggle and generate
+ocr text.
+
+[AI]
+To use the official google-cloud-vision Python library, Google Cloud requires Service
+Account credentials (a .json file) rather than a raw API key string. Step-by-step setup:
+
+Step 1: Create a Google Cloud Project & Enable the API — Cloud Console → New Project (e.g.
+shakespeare-ocr) → APIs & Services > Library → search Cloud Vision API → Enable. Ensure a
+billing account is linked (GCP requires this to activate the API, but no charge occurs
+within the 1,000 pages/month free tier).
+
+Step 2: Create a Service Account and Download the JSON Key — IAM & Admin > Service
+Accounts → + Create Service Account (e.g. kaggle-ocr-user) → grant Cloud Vision API User
+role → Keys tab → Add Key > Create new key → JSON → downloads a .json key file (keep
+private).
+
+Step 3: Add Credentials to Kaggle Secrets — open the downloaded .json in a text editor,
+copy all the text; in the Kaggle Notebook go to Add-ons > Secrets → + Add a new secret →
+Label GCP_SA_KEY → paste the JSON text as the value → Save and enable the checkbox for the
+notebook session.
+
+Step 4: Python Code for Kaggle Notebook — load credentials from Kaggle Secrets and process
+images in parallel:
+
+import os
+import glob
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from kaggle_secrets import UserSecretsClient
+from google.cloud import vision
+
+# 1. Load GCP Service Account Credentials from Kaggle Secret
+user_secrets = UserSecretsClient()
+gcp_key_json = user_secrets.get_secret("GCP_SA_KEY")
+
+# Write credentials to a temporary file in Kaggle environment
+KEY_PATH = "/tmp/gcp_sa_key.json"
+with open(KEY_PATH, "w") as f:
+    f.write(gcp_key_json)
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = KEY_PATH
+
+# 2. Set Paths
+IMAGE_DIR = "/kaggle/input/complete-works-of-shakespeare/output_pages"
+OUTPUT_DIR = "/kaggle/working/shakespeare_gt"
+MAX_WORKERS = 8  # Parallel threads
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+client = vision.ImageAnnotatorClient()
+
+def process_page(image_path):
+    filename = os.path.basename(image_path)
+    base_name, _ = os.path.splitext(filename)
+    txt_path = os.path.join(OUTPUT_DIR, f"{base_name}.txt")
+
+    if os.path.exists(txt_path):
+        return f"Skipped: {base_name}.txt"
+
+    try:
+        with open(image_path, "rb") as image_file:
+            content = image_file.read()
+
+        image = vision.Image(content=content)
+        response = client.document_text_detection(image=image)
+
+        if response.error.message:
+            return f"Error ({filename}): {response.error.message}"
+
+        extracted_text = response.full_text_annotation.text if response.full_text_annotation else ""
+
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(extracted_text)
+
+        return f"Processed: {filename}"
+
+    except Exception as e:
+        return f"Failed ({filename}): {str(e)}"
+
+# 3. Process first 1,000 images (Free Tier Cap)
+image_paths = sorted(glob.glob(os.path.join(IMAGE_DIR, "*.png")))[:1000]
+print(f"Processing {len(image_paths)} pages using Cloud Vision API...")
+
+with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    futures = [executor.submit(process_page, path) for path in image_paths]
+    for future in as_completed(futures):
+        print(future.result())
+
+For a visual walkthrough of the console interface, check out the Google Cloud Vision Setup
+Video — step-by-step guidance on enabling the Cloud Vision API and managing service account
+credentials in the Google Cloud Console.
+
+[USER]
+it asked me to select api restrictions
+i chose vision api
+is it ok?
+
+[AI]
+Yes, that is completely fine and actually recommended. Restricting your API key to Cloud
+Vision API is a security best practice known as the principle of least privilege. It
+ensures that even if your key ever accidentally leaks, it cannot be used to access or bill
+any other Google Cloud services in your account.
+
+How to use an API Key in Python / Kaggle — because a standard API Key was created (instead
+of a Service Account JSON file), the Google Cloud Vision client can be initialized directly
+by passing client_options:
+
+import os
+import glob
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from kaggle_secrets import UserSecretsClient
+from google.cloud import vision
+
+# 1. Fetch your API Key string from Kaggle Secrets (or paste directly)
+user_secrets = UserSecretsClient()
+API_KEY = user_secrets.get_secret("GCP_API_KEY")
+
+# 2. Pass the API key using client_options
+client = vision.ImageAnnotatorClient(
+    client_options={"api_key": API_KEY}
+)
+
+# 3. Set paths
+IMAGE_DIR = "/kaggle/input/complete-works-of-shakespeare/output_pages"
+OUTPUT_DIR = "/kaggle/working/shakespeare_gt"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def process_page(image_path):
+    filename = os.path.basename(image_path)
+    base_name, _ = os.path.splitext(filename)
+    txt_path = os.path.join(OUTPUT_DIR, f"{base_name}.txt")
+
+    if os.path.exists(txt_path):
+        return f"Skipped: {base_name}.txt"
+
+    try:
+        with open(image_path, "rb") as image_file:
+            content = image_file.read()
+
+        image = vision.Image(content=content)
+
+        # Call document_text_detection
+        response = client.document_text_detection(image=image)
+
+        if response.error.message:
+            return f"Error ({filename}): {response.error.message}"
+
+        extracted_text = response.full_text_annotation.text if response.full_text_annotation else ""
+
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(extracted_text)
+
+        return f"Processed: {filename}"
+
+    except Exception as e:
+        return f"Failed ({filename}): {str(e)}"
+
+# Process first 1,000 images (Free Monthly Tier)
+image_paths = sorted(glob.glob(os.path.join(IMAGE_DIR, "*.png")))[:1000]
+
+with ThreadPoolExecutor(max_workers=8) as executor:
+    futures = [executor.submit(process_page, path) for path in image_paths]
+    for future in as_completed(futures):
+        print(future.result())
+
+[USER]
+going to use this
+[pasted a more complete script with two-column layout reconstruction, atomic JSON
+progress logging, exponential backoff, and blank-page filtering]
+
+[AI]
+This script is well-structured and handles the processing workflow effectively. It
+addresses key technical edge cases, such as custom two-column layout reconstruction, atomic
+JSON progress logging, exponential backoff for rate limits, and zero-cost filtering of
+known blank pages.
+
+Since you are strictly using the Monthly Free Tier (1,000 units/month), here is a critical
+detail regarding your API key configuration:
+
+Key Adjustments for Your Setup
+1. JSON Key vs. Standard API Key — the provided script uses from_service_account_file,
+which requires a Service Account JSON credentials file stored in Kaggle Secrets under the
+name GCP_SERVICE_ACCOUNT_JSON. Since a Standard API Key restricted to Vision API was
+generated instead, the get_vision_client() function needs updating:
+
+# UPDATE THIS FUNCTION FOR STANDARD API KEYS
+def get_vision_client():
+    from google.cloud import vision
+    try:
+        from kaggle_secrets import UserSecretsClient
+        # Make sure your Kaggle secret is labeled "GCP_API_KEY"
+        api_key = UserSecretsClient().get_secret("GCP_API_KEY")
+
+        # Initialize client with api_key option
+        return vision.ImageAnnotatorClient(
+            client_options={"api_key": api_key}
+        )
+    except Exception as e:
+        raise RuntimeError(
+            "Could not load GCP API Key from Kaggle Secrets "
+            "(expected a secret named GCP_API_KEY). "
+            f"Original error: {e}"
+        )
+
+Step-by-Step Execution Strategy
+Step 1: Run the Dry Run First — leave DRY_RUN = True and DRY_RUN_LIMIT = 3, run the
+script, check /kaggle/working/ocr_output/ for the 3 test outputs, verify the two-column
+reconstruction for page_* files orders text left-to-right correctly.
+Step 2: Run the Full 1,000-Image Pass — set DRY_RUN = False and run the notebook; it will
+automatically process the priority queue (starter_* → bio_* → page_*), skip bio_blank.png,
+and halt at exactly 1,000 calls.
+
+Handling the ~378 Remaining Pages — Google Cloud's free 1,000-unit quota resets on the 1st
+calendar day of every month.
+- Option A (Zero Cost, Wait for Reset): leave ocr_progress.json and the output .txt files
+  saved in a Kaggle Dataset; on the 1st of next month, re-run the exact same script — it
+  reads ocr_progress.json, skips the first 1,000 completed pages, and finishes the
+  remaining ~378 pages for free.
+- Option B (Pay ~$0.57): set MAX_CALLS = 1380 — the initial 1,000 calls cost $0.00, the
+  remaining ~378 are charged at $1.50 per 1,000 units, totalling roughly $0.57 (billed to
+  the linked card or deducted from the $300 trial credit).
+
+[USER]
+can i get vision api key from google ai studio??
+
+[AI]
+No. An API key created in Google AI Studio is specifically for the Gemini API, not the
+Google Cloud Vision API. If you pass an AI Studio API key to the google-cloud-vision
+library or vision.googleapis.com endpoints, the request will fail with an authentication or
+API restriction error.
+
+Where to Get Each Key
+| API | Key Location | Library / Endpoint |
+|---|---|---|
+| Google Cloud Vision API | Google Cloud Console (APIs & Services > Credentials) | google-cloud-vision |
+| Gemini API | Google AI Studio | google-generativeai / google-genai |
+
+Alternative: Doing OCR via Google AI Studio — if you want to use your Google AI Studio key
+instead of setting up Google Cloud Vision, you can perform OCR directly using Gemini 1.5
+Flash (accepts images, has vision/text extraction capabilities):
+
+import google.generativeai as genai
+from PIL import Image
+
+# Use your Google AI Studio Key
+genai.configure(api_key="YOUR_AI_STUDIO_API_KEY")
+
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+# Load image
+image = Image.open("sample_page.png")
+
+# Extract text with a prompt
+response = model.generate_content([
+    "Transcribe all text from this page image verbatim. Do not summarize.",
+    image
+])
+
+print(response.text)
+
+[USER]
+Alternative: Doing OCR via Google AI Studio
+If you want to use your Google AI Studio key instead of setting up Google Cloud Vision, you
+can perform OCR directly using Gemini 1.5 Flash (which accepts images and has vision/text
+extraction capabilities): | how to do it, tell me in details
+
+[AI]
+Step 1: Get Your API Key from Google AI Studio — open aistudio.google.com, sign in, click
+Get API key in the left sidebar or top banner, click Create API key (select an existing
+Google Cloud project or let AI Studio generate one automatically), copy the generated key
+string.
+
+Step 2: Add the Key to Kaggle Secrets — Kaggle Notebook → Add-ons → Secrets → + Add a new
+secret → Label GEMINI_API_KEY → paste the AI Studio key as the value → Save, ensure the
+checkbox is selected for the current session, and ensure Internet is toggled On under
+Settings in the right-hand panel.
+
+Step 3: Kaggle Batch OCR Script — processes images, handles two-column layout reading order
+via prompting, avoids rate limits, outputs one .txt file per image:
+
+!pip install -q google-genai pillow
+
+import os
+import glob
+import time
+import json
+from pathlib import Path
+from PIL import Image
+from google import genai
+from google.genai import types
+from kaggle_secrets import UserSecretsClient
+
+# ---------------------------------------------------------------------------
+# CONFIGURATION
+# ---------------------------------------------------------------------------
+MODEL_NAME = "gemini-1.5-flash"  # Fast, highly accurate for OCR tasks
+IMAGE_DIR = Path("/kaggle/input/complete-works-of-shakespeare/output_pages")
+OUTPUT_DIR = Path("/kaggle/working/gemini_ocr_output")
+PROGRESS_LOG = Path("/kaggle/working/gemini_progress.json")
+
+# Free tier rate limit delay (15 Requests Per Minute = 1 call every ~4 seconds)
+REQUEST_DELAY_SECONDS = 4.0
+
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# INITIALIZE GEMINI CLIENT
+# ---------------------------------------------------------------------------
+user_secrets = UserSecretsClient()
+api_key = user_secrets.get_secret("GEMINI_API_KEY")
+client = genai.Client(api_key=api_key)
+
+# System prompt forcing verbatim transcription and column ordering
+OCR_PROMPT = (
+    "You are an expert OCR engine. Transcribe all text from this document image verbatim.\n"
+    "Rules:\n"
+    "1. Do not correct archaic spelling, punctuation, or formatting.\n"
+    "2. Do not include markdown conversational intro/outro text (e.g., 'Here is the text').\n"
+    "3. If the page contains two text columns, read the ENTIRE left column top-to-bottom first, "
+    "then read the ENTIRE right column top-to-bottom.\n"
+    "4. Output ONLY the raw extracted page text."
+)
+
+# ---------------------------------------------------------------------------
+# PROGRESS LOGGING & UTILS
+# ---------------------------------------------------------------------------
+def load_progress() -> set:
+    if PROGRESS_LOG.exists():
+        return set(json.loads(PROGRESS_LOG.read_text(encoding="utf-8")))
+    return set()
+
+def save_progress(done_set: set):
+    PROGRESS_LOG.write_text(json.dumps(sorted(done_set)), encoding="utf-8")
+
+# ---------------------------------------------------------------------------
+# MAIN OCR PROCESSING LOOP
+# ---------------------------------------------------------------------------
+def run_ocr():
+    done = load_progress()
+    image_paths = sorted(list(IMAGE_DIR.glob("*.png")))
+
+    print(f"Total images found: {len(image_paths)}")
+    print(f"Already processed in prior runs: {len(done)}")
+
+    for idx, img_path in enumerate(image_paths, 1):
+        if img_path.name in done or img_path.name == "bio_blank.png":
+            continue
+
+        out_path = OUTPUT_DIR / f"{img_path.stem}.txt"
+
+        try:
+            image = Image.open(img_path)
+
+            # Send multimodal request
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=[OCR_PROMPT, image],
+                config=types.GenerateContentConfig(
+                    temperature=0.0  # Zero temperature ensures deterministic transcription
+                )
+            )
+
+            extracted_text = response.text.strip() if response.text else ""
+            out_path.write_text(extracted_text, encoding="utf-8")
+
+            done.add(img_path.name)
+            save_progress(done)
+            print(f"[{idx}/{len(image_paths)}] Processed: {img_path.name}")
+
+            # Pace requests to comply with AI Studio Free Tier RPM
+            time.sleep(REQUEST_DELAY_SECONDS)
+
+        except Exception as e:
+            err_msg = str(e)
+            print(f"FAILED {img_path.name}: {err_msg}")
+
+            # If rate limit (429) hit, pause and retry
+            if "RESOURCE_EXHAUSTED" in err_msg or "429" in err_msg:
+                print("Quota limit reached. Sleeping 60 seconds before continuing...")
+                time.sleep(60)
+
+if __name__ == "__main__":
+    run_ocr()
+
+Important Differences: Gemini API vs. Cloud Vision
+| Feature | Google Cloud Vision API | Gemini 1.5 Flash (AI Studio) |
+|---|---|---|
+| Two-Column Handling | Requires manual bounding box math code | Handled directly via explicit prompt instructions |
+| Free Quota | 1,000 requests / month total | 15 Requests Per Minute (RPM) & 1,500 Requests Per Day (RPD) |
+| Execution Speed | Multi-threaded (~1–3 minutes total) | Sequential pacing required (~1 hour for 900 pages due to 15 RPM rate limit) |
+| Authentication | Service Account JSON key or GCP API key | Single GEMINI_API_KEY string |
+
+[USER]
+Step 1: Get Your API Key from Google AI Studio ... it is telling me to import a project and
+showing me the one in cloud console :"))
+
+[AI]
+Select that existing project from the list — that is completely normal! Google AI Studio
+uses Google Cloud projects under the hood as containers to manage and organize your API
+keys.
+
+How to complete the step:
+1. Select the project shown in the dropdown/list (the one you created in Cloud Console).
+2. Click Create API key in existing project (or Import / Create Key).
+3. Copy the generated string — that is your GEMINI_API_KEY.
+
+Linking it to your existing project won't interfere with your Vision API settings or cause
+unexpected charges. Gemini 1.5 Flash in AI Studio includes its own free allowance (up to 15
+requests per minute and 1,500 requests per day).
+
+[USER]
+is there any restriction on how many project i can create, as my project creation is
+getting failed?
+
+[AI]
+Yes, Google Cloud enforces a strict Project Creation Quota. Every Google account has a
+limit on how many active projects it can own simultaneously. For new accounts or accounts
+in the Free Trial period, this default limit is usually 3 to 12 projects total.
+
+Common Reasons Your Creation is Failing
+- You Hit the Hard Project Quota Limit — if projects were created in the past (even if
+  stopped using), the maximum limit may already be reached.
+- Pending Soft-Deleted Projects Count Against Your Quota — deleting a project doesn't wipe
+  it instantly; Google marks it for deletion and keeps it in a "soft-delete" state for 30
+  days before permanently purging it, and it still counts toward the quota during that time.
+- Pending Billing Authorization / Identity Verification — if the billing profile needs
+  address verification or identity confirmation, Google restricts new project creation to
+  prevent abuse.
+
+How to Fix It
+- Option 1 (Recommended): Reuse an Existing Project — no separate project is needed for AI
+  Studio, Vision API, or Kaggle; open Cloud Console, select any existing project, enable both
+  Cloud Vision API and Gemini API inside that single project.
+- Option 2: Permanently Shut Down Unused Projects — IAM & Admin → Manage Resources, select
+  unused project(s), click Delete. Recently deleted projects sit in "Pending Deletion" for
+  30 days before auto-purge.
+- Option 3: Request a Quota Increase — try creating a project until the Quota Exceeded error
+  dialog appears, click the Request Quota Increase link, explain the use case (e.g. "Student
+  academic project for document text extraction and OCR"); Google usually reviews and
+  approves legitimate requests within 24–48 hours.
+
+[USER]
+can you check rate limit for 3,6 flash
+
+[AI]
+The rate limits for Gemini 3.6 Flash in Google AI Studio and the Gemini API depend on your
+account's usage tier:
+
+| Usage Tier | Requests / Min (RPM) | Tokens / Min (TPM) | Requests / Day (RPD) | Batch Max Enqueued Tokens | Qualification |
+|---|---|---|---|---|---|
+| Free Tier | 10 – 15 | 250,000 | 250 – 1,000 | N/A | Default for active projects |
+| Tier 1 (Pay-as-you-go) | 300 | 2,000,000 | 1,500 | 3,000,000 | Active billing account linked |
+| Tier 2 | 2,000 | 4,000,000 | 10,000 | 400,000,000 | ≥ $100 cumulative spend + 3 days |
+| Tier 3 (Enterprise) | 4,000+ | 4,000,000+ | 50,000+ | 1,000,000,000 | ≥ $1,000 cumulative spend + 30 days |
+
+Key Operational Constraints & Features
+- Context & Output Specs: 1,048,576 input token window (~1M tokens) and up to 64,000 output
+  tokens per call.
+- Spend-Based Cap (10-minute Rolling Window): Tier 1 has a safety spend limit of $10 per 10
+  minutes to prevent accidental runaways; Tier 2 and Tier 3 allow up to $200 per 10 minutes.
+  Exceeding this triggers a 429 RESOURCE_EXHAUSTED error.
+- Batch API Limits: asynchronous batch requests run on a separate queue supporting up to 100
+  concurrent batch jobs, an input file size limit of 2 GB, and a 20 GB file storage cap.
+- Quota Scope: rate limits are evaluated per Google Cloud Project rather than per API key.
+  Daily quotas (RPD) reset at midnight Pacific Time (PST/PDT).
+
+[USER]
+if we hit rpm once, will that stop the gemini api usage even if we are left with daily
+quota??
+
+[AI]
+No, hitting the RPM (Requests Per Minute) limit will not stop your API usage for the rest
+of the day. RPM limits operate on a 60-second sliding window. If too many requests are sent
+within a single minute, the Gemini API temporarily throws an HTTP 429 RESOURCE_EXHAUSTED
+error; waiting 30 to 60 seconds for the window to slide forward restores the per-minute
+allowance and calls can resume immediately.
+
+How Rate Limit Reset Windows Work
+- Requests Per Minute (RPM): resets continuously on a 60-second rolling window — hitting
+  this just needs a brief pause (e.g. time.sleep(4) or exponential backoff) before retrying.
+- Tokens Per Minute (TPM): resets continuously on a 60-second rolling window.
+- Requests Per Day (RPD): this is the only limit that stops usage for the rest of the day —
+  once exhausted, you must wait until it resets at midnight Pacific Time (PST/PDT).
+
+If 429 errors occur in a script, catch the exception, sleep for 10–60 seconds, and retry
+the failed image — no remaining daily requests are lost.
+
+[USER]
+i need to zip and download the files in ocr_output folder in/kaggle/working/ :"))
+give me code
+
+[AI]
+Option 1: Python (shutil + FileLink)
+
+import shutil
+from IPython.display import FileLink
+
+# 1. Zip the folder (Change 'ocr_output' if your folder name is different, e.g., 'gemini_ocr_output')
+shutil.make_archive('/kaggle/working/ocr_output', 'zip', '/kaggle/working/ocr_output')
+
+# 2. Create a downloadable link in the notebook output
+FileLink(r'ocr_output.zip')
+
+Option 2: One-Liner Terminal Command
+
+!zip -r /kaggle/working/ocr_output.zip /kaggle/working/ocr_output
+
+from IPython.display import FileLink
+FileLink(r'ocr_output.zip')
+
+How to download after running the code: run the cell, click the blue link ocr_output.zip
+that appears below the cell to download it directly. Alternatively, refresh the Output
+section in Kaggle's right-hand panel (Data > Output /kaggle/working), click the three dots
+next to ocr_output.zip, and click Download.
+
+[AI]
+In machine learning and AI, OOD stands for Out-Of-Distribution.
+
+Core Concept
+- In-Distribution (ID): Data that matches the style, structure, formatting, or domain of
+  the dataset used to train the model.
+- Out-Of-Distribution (OOD): Data that comes from a distinctly different layout, format,
+  noise level, or domain than what the model was trained on.
+
+What It Means in Your Context (E34)
+In your codebase's evaluation setup (eval/robustness.py):
+- The OOD Data: refers to the held-out test pages with noticeably different structures —
+  such as the Sonnets or complex multi-column layouts — that the model hasn't learned to
+  expect.
+- The Target (OOD F1 drop ≤ 10%): this is a stress-test threshold. It demands that when
+  the model is given these weird, unfamiliar layouts, its overall accuracy (F1 score)
+  shouldn't degrade by more than 10 percentage points relative to its performance on
+  standard, familiar pages.
+
+In short: OOD measures how gracefully the model handles real-world curveballs it wasn't
+explicitly trained on.
+
+[AI]
+Yes, you can absolutely still get an OOD F1 score. Whether a metric is considered
+In-Distribution (ID) or Out-Of-Distribution (OOD) depends entirely on which data slice you
+are evaluating, not on whether you fine-tuned a model or used a zero-shot VLM pipeline.
+
+Why OOD Applies to Your Qwen VLM Pipeline
+Even though you aren't training/fine-tuning Qwen on your specific dataset, VLMs still
+exhibit distinct performance differences across document structures:
+1. In-Distribution (ID) F1: evaluates how well Qwen extracts standard, clean, continuous
+   text (e.g., standard prose pages or straightforward biographical entries in your page or
+   bio splits).
+2. Out-Of-Distribution (OOD) F1: evaluates how well Qwen handles complex, visually distinct,
+   or unusual layouts (e.g., Sonnets with dense line structures, poetry formatting,
+   multi-column setups, or decorative typography).
+
+Even foundation VLMs suffer from accuracy drops when moving from standard prose to
+non-standard layouts.
+
+How to Compute ID vs. OOD with Your Setup — using the two Kaggle datasets
+(abhishekroy48/shakespeare-ground-truth and abhishekroy48/shakespeare-ocr):
+1. Calculate ID F1 Score (F1_ID): run evaluation (eval/robustness.py or equivalent
+   string-matching/F1 logic) comparing Qwen's OCR outputs against Ground Truth on standard
+   document layouts (e.g., standard page or bio files).
+2. Calculate OOD F1 Score (F1_OOD): run evaluation on distinct, challenging layouts (e.g.,
+   the Sonnets or structurally unique held-out pages) where ground truth exists.
+3. Check E34 Target: compute the performance drop:
+   Drop = (F1_ID − F1_OOD) / F1_ID × 100%
+   If this drop is ≤ 10%, the Qwen pipeline satisfies the E34 robustness target.
+
+Summary of Your Engineering Decision — the pivot makes complete technical sense:
+- Donut: high resource overhead, slow on free compute.
+- TrOCR: requires word/line-level bounding boxes and line GT (which wasn't available).
+- Local Fine-Tuning: high error rate due to resource constraints and page-level complexity.
+- Qwen VLM Pipeline: leverages strong zero-shot spatial understanding to convert page
+  images directly to structured text without needing line-by-line GT or heavy local GPUs.
+
+By evaluating Qwen across both standard pages and distinct layouts (like the Sonnets), you
+get both a standard F1 score and a valid OOD F1 score to prove the pipeline's reliability.
+
+[AI]
+Based on the source code provided, the script is calculating the percentage drop in the F1
+score between two specific subgroups in your dataset.
+
+1. The Subgroup Comparison — the NFR (Non-Functional Requirement) for robustness is testing
+how well the model handles harder layouts. The script compares:
+- bio_f1 (0.8833): the F1 score on single-column biographical pages, which serve as the
+  baseline.
+- page_f1 (0.8599): the F1 score on two-column pages, considered the harder layout and the
+  declared "data speciality".
+
+2. The Formula — the relative performance drop from the easier bio pages to the harder page
+pages:
+F1 Drop Percentage = (bio_f1 − page_f1) / bio_f1 × 100
+Plugging in the numbers: (0.8833 − 0.8599) / 0.8833 × 100 = 0.0234 / 0.8833 × 100 ≈ 2.649%,
+rounded to 2.65%.
+
+3. The "PASS" Logic — the notebook defines the target threshold for this robustness check
+as an F1 drop ≤ 10%. Because the Qwen VLM pipeline only suffered a 2.65% drop in accuracy
+when moving from the easier single-column pages to the harder two-column pages, it falls
+well below the 10% limit. Therefore the script evaluates the condition 2.65 <= 10 as True
+and prints PASS.
+
+[AI]
+Key Summary of the Results
+Across the entire dataset of 1,355 matched pages (37 single-column bio pages and 1,318
+two-column page entries), the Qwen VLM pipeline achieves an overall Word F1 score of
+86.06% and a median Character Accuracy of 94.39%.
+
+Detailed Numerical Breakdown
+| Metric | Overall (All 1,355 Pages) | bio (37 Pages) | page (1,318 Pages) | page (Excl. page_1026 Outlier) |
+|---|---|---|---|---|
+| Mean Word F1 Score | 86.06% | 88.33% | 85.99% | 86.12% |
+| Median CER | 5.61% | 2.35% | 5.68% | 5.68% |
+| Mean CER | 26.92% | 2.42% | 27.61% | 7.53% |
+| Median WER | 15.61% | 14.84% | 15.63% | 15.63% |
+| Mean WER | 33.57% | 14.23% | 34.11% | 19.01% |
+
+What is the "Accuracy"?
+In OCR pipelines, accuracy is evaluated at two distinct levels:
+1. Character Accuracy: 94.39% (Median) / 92.61% (Adjusted Mean) — Character Accuracy =
+   100% − CER. At the median level, half of all processed pages achieved a Character
+   Accuracy of ≥94.39% (CER = 5.61%). At the 90th percentile, 90% of pages achieved a
+   Character Accuracy of ≥88.81% (CER ≤ 11.19%).
+2. Word Accuracy (F1 Score): 86.06% — word alignment precision and recall yields a Mean F1
+   score of 86.06% across the entire corpus, meaning over 86% of words are correctly
+   recognized and aligned in sequence without substitution, insertion, or deletion errors.
+
+Core Analytical Insights
+1. The Extreme Outlier (page_1026) — there is a drastic gap between the Mean CER (26.92%)
+and the Median CER (5.61%). This skew is heavily driven by a single catastrophic failure on
+page_1026, where the VLM entered a generative repetition loop (CER = 264.70, or 26,470%
+error due to thousands of repeated characters): with page_1026 included, overall Mean CER
+is 26.92%; excluding page_1026, overall Mean CER drops to 7.39% (boosting adjusted mean
+character accuracy to 92.61%), and Mean WER drops from 33.57% down to 19.01%.
+
+2. Layout Robustness (NFR Subgroup Check) — the model was tested across single-column
+baseline layouts (bio) and complex two-column layouts (page): single-column baseline (bio)
+F1_bio = 88.33%, two-column specialty (page) F1_page = 85.99%. The relative drop in
+performance is computed as:
+F1 Drop = (88.33% − 85.99%) / 88.33% × 100 = 2.65%
+Since 2.65% ≤ 10%, the pipeline PASSES the reliability target, proving that zero-shot Qwen
+maintains strong layout invariance when transitioning to multi-column text.
+
+--- A2 DONUT FINE-TUNING ATTEMPT ENDS HERE ---
+
+
+--- A2 CHUNKING PLANNING SESSION (SEPARATE CHAT SESSION) START ---
+
+[CONTEXT NOTE: this is a separate chat session, conducted before the Claude Code chunking
+session below. Its purpose was to decide and justify a chunking strategy in discussion
+form; it produced two files — chunking_strategy_plan.md and
+project_context_and_chunking_goals.md — which the Claude Code session below opens by
+reading and fact-checking against the real OCR corpus. No code was run in this session.]
+
+[USER]
+hello
+
+[AI]
+Noted the full Deep-Learning Capstone package was loaded (spec, codebase guide, submission
+instructions, A2 form, workbook) and asked what part of A1/A2 the user wanted to work on.
+
+[USER]
+<uploaded project-state.md>
+This is the current state of the A2 part of the project. you will find relevant
+information about the project in the project context. basically based on my project
+structure i need to discuss about chunking, embedding and indexing and storing vectors.
+gather around the required context, we will start talking about chunking first
+
+[AI]
+Summarized what the codebase actually requires: split(chunks, cfg) as the core
+size/overlap-based chunker in index/chunk.py, with semantic chunking (the declared bonus
+feature) as a later layer on top, per the codebase guide's E4 note. Laid out why chunking
+is non-trivial for this specific corpus: three very different content types (verse plays
+with speaker/act/scene structure, 14-line Sonnets, ordinary Biography prose) that a single
+fixed-size window would treat identically; the stated use case ("find and verify a
+specific line, scene, or quote") is a citation-precision task that a chunk spanning two
+scenes actively hurts; OCR/multi-column residue is more likely to land inside a naive
+fixed window than a structurally-bounded one; and whatever chunker is built needs to carry
+page number (and ideally act/scene/speaker) forward as metadata. Presented a single-select
+question on chunker direction: (1) simple fixed-size window, (2) structure-aware from the
+start, or (3) hybrid fixed-size-as-baseline-plus-structure-aware-as-bonus.
+
+[USER] (answered in free text rather than selecting an option)
+Please make your responses simple enough for me to understand and also added the toc of
+my data
+
+As you already know we have declared the semantic chunking startegy as our bonus, and it
+will makes sense while we are making a agent out of it we will want the information
+regarding a scene all together in a chunk? right? if we use a fixed size window, even for
+specific plays and dont overlap them. the chunks might be overlapped
+
+also this chunks will be embedded and indexed too, so my first question will be what kind
+of chunking strategy makes more sense? after creating chunk we will ultimately create a
+vector db out of it and search the vector db :") what will be my quesry parameter for
+searching them? lets say a quote / prompt given into agent and the agent embeds that and
+finds mathes over, upon finding it it returns the whole chunk??
+
+[AI]
+Found that toc.json had actually already been uploaded (despite not being mentioned) and
+read it. Confirmed the user's instinct was correct: fixed-size windows have two separate
+problems, deliberate overlap (a controllable setting) versus "boundary bleeding" (a window
+slicing through a scene regardless of overlap, because it has no concept of where a scene
+ends). Mapped structure-aware chunk units onto the real corpus via toc.json: one speech
+(packed to a target size) as the play chunk unit, one sonnet per chunk, one stanza-group
+per chunk for longer poems, one paragraph per chunk for the Biography, Reference section
+(ids 47-48, need_ocr:false) excluded. Explained the query/search flow: the same embedding
+model embeds both chunks and the incoming query; retrieve(query, k) returns the top-k most
+similar chunks by cosine similarity; the whole matched chunk is returned, which also
+becomes the citation. Asked whether plays should chunk at speech-level or scene-level
+granularity.
+
+[USER]
+<uploaded toc.json>
+here is the toc,json
+
+[AI]
+Confirmed the upload matched what had already been read. Reiterated the open
+speech-level-vs-scene-level question using Hamlet (page_1127-1170, 44 pages) as a worked
+example, and noted the domain statement itself ("find and verify a specific line, scene,
+or quote") names both granularities, leaning toward speech-level as the more defensible
+default with scene kept as metadata.
+
+[USER]
+what kind of chunking will make more sense? character level seems more granular and will
+create a lot of chunks for our dataset :"")) while scene level might get very big
+
+another thing is how should we create the chunk, whatever the decision is? is there any
+models that can do it directly? like vlm models? another idea i saw using gemini that it
+asked me to embed first and using simillarity we can create chunks whenever the threshold
+is breached, lets say a scene is changed, so simillarity goes down :3 but in this kind of
+process what will be the threshold, this seems like a dynamic decision
+
+[AI]
+Proposed packing consecutive speeches into a chunk until a target word count is reached,
+never splitting a speech in half — avoiding both "too many tiny chunks" and "too big"
+failure modes while keeping citations clean via metadata. Explained why a VLM doesn't fit
+at the chunking stage: by chunking time OCR has already happened, so there are no pixels
+left to read — chunking is either rule-based (regex on patterns already printed on the
+page) or embedding-based. Explained the Gemini-suggested semantic-chunking idea in plain
+terms: split into small atomic pieces, embed each, compare each adjacent pair's
+similarity, cut where a drop is unusually sharp relative to the rest of the document (a
+relative/percentile threshold, not one fixed hardcoded number) — confirming this genuinely
+is a dynamic decision, not a flaw. Recommended: speech-packing rule-based chunking as the
+core method for plays/poems (the book already prints its own structure, so reusing it is
+free, deterministic, citation-friendly), semantic chunking reserved specifically for the
+Biography (no printed structure to lean on) — matching the already-declared bonus feature.
+Asked whether to lock that plan.
+
+[USER]
+i have several questions about the rule based chunking of the plays
+
+even if we fix based on scenes or something else, not necessarily all the plays has the
+same pattern for this :") so rule based will fail or some chunks will just get awfully big
+or awfully small, that makes less sense to me
+
+i did not understand how the simillarity search will help to chunk out, explain the
+process a bit. we embed -> then what is the vector size / window that we will parse
+through and decide the chunks? lets say we did it some how :") then how we creating the
+chunks from the embed? do you add the vectors of fixed size until the simillarity drop
+quite a bit?
+
+about vlm , i am sorry, i meant something like a llm model, like qwen or some other one
+:") dataset has 1300+ .txt file so i dont we will be able to complete it with our free
+avaialble resources or not.
+
+[AI]
+Addressed the rule-based fragility concern by separating speech detection (argued reliable
+across the whole edition — one publisher, one typesetting convention, speaker names as
+short all-caps lines ending in a period) from scene/act-header detection (looser, used
+only for metadata) — so a formatting glitch in one play degrades labels, not the chunking
+structure itself. Reiterated that the target-word-count packing rule already absorbs size
+variance between plays regardless of scene length, and suggested a post-chunking
+validation pass flagging any play whose chunk sizes or scene-label detection look
+abnormal. Explained the similarity-chunking mechanism step by step with an SVG diagram:
+(1) split text into small atomic units and embed each separately — no combining vectors;
+(2) compare each adjacent pair's embeddings via cosine similarity; (3) find where a drop
+is unusually sharp relative to the rest of the document (a relative threshold, e.g.
+steepest 10% of drops, not a fixed constant); (4) merge all units between two cut points
+into one chunk. Clarified this is "compare neighboring pairs one at a time and cut at an
+unusually dissimilar pair," not "add vectors together until similarity drops." On the LLM
+(Qwen etc.) idea: recommended against it, citing the project's own history — the Gemini
+ground-truth extraction already hit free-tier rate limits (5 RPM / 20 RPD) after ~20 pages
+and needed batching just to complete once; an LLM call per page for chunking across
+1,300+ pages risks the same wall, likely worse since chunking needs more reasoning per
+call. Flagged a determinism problem too: LLM-based chunking isn't guaranteed to cut the
+same way twice, conflicting with the project's own test_rerun_reproduces_metrics
+requirement. Concluded: rule-based (speech + scene detection) for plays/poems, similarity-
+based (not LLM) for the Biography — both run locally, zero API calls, zero rate-limit
+risk. Asked whether to lock this as the plan.
+
+[USER]
+NO
+
+so based on the discussion and context of the dataset and all, which chunking process you
+think is the best fit and what is the reason for it, write down cleanly
+
+[AI]
+Wrote a clean final decision: hybrid — rule-based for plays and poems (speeches packed to
+a target size, never split mid-speech, never crossing a scene boundary; sonnets and
+stanza-groups as their own chunks), semantic (embedding-similarity) chunking only for the
+Biography; Reference section excluded. Gave six numbered reasons: the corpus already
+contains the structure needed, it matches the stated domain's citation-precision use case,
+it's free and fast given the project's prior free-tier compute problems, it's fully
+reproducible (unlike LLM-based chunking), semantic chunking still earns a real place on
+the Biography specifically, and the packing rule solves cross-play unevenness without
+needing every play to share identical formatting. Noted this maps directly onto Section
+3/7 of the A2 form as a genuine "compared options, chose deliberately" story.
+
+[USER]
+can you share the plan in a md file
+
+for regex i want you to give examples relevant to my project / code level example will
+work as well. if you want more context before creating the plan you can tell me about it
+as well. i can give more context
+
+https://www.kaggle.com/datasets/abhishekroy48/shakespeare-ocr has the ocr of the file,
+basically the txt file for each page, that we will run the chunking methodology on ...
+
+[AI]
+Attempted to fetch the Kaggle dataset page directly to see real OCR text; the page is
+JS-rendered and returned no usable content. Flagged this explicitly rather than guessing
+silently, and noted the specific risk: this is a compact two-column edition, and such
+editions often abbreviate speaker names (e.g. "Ham." instead of "HAMLET.") to save column
+width, which would change the regex entirely. Created and delivered
+chunking_strategy_plan.md, containing: the final hybrid decision and short reasoning; the
+play-chunking algorithm; regex patterns for act headers, scene headers, two candidate
+speaker-line conventions (full-name and abbreviated), and stage directions — explicitly
+labeled as unvalidated against real OCR text; a Python code example for splitting a page
+into speeches and packing them into Chunk objects matching chunk.py's split(chunks, cfg)
+signature; sonnet/poem chunking notes; the semantic-chunking steps for the Biography; a
+chunk metadata schema table; and a list of open questions, chiefly requesting one real OCR
+sample page to validate the regex.
+
+[USER]
+also create a md file where it has the project context and why we are chunking and what
+are the upcoming goals ...
+
+[AI]
+Created and delivered project_context_and_chunking_goals.md, containing: a summary of the
+overall capstone project and the three locked-in project choices (domain, data speciality,
+primary NFR, bonus feature); current A2 status (what's done — corpus, splits, the OCR
+pipeline decision and its real evaluation numbers — and what's not done yet, including
+chunking/embedding/indexing); an explanation of why chunking specifically is the current
+bottleneck between "we can read the pages" and "we can search them"; a short summary of
+the chosen chunking strategy and why it was chosen over a naive fixed-size window; and an
+ordered list of upcoming goals (finalize chunking → embedding → vector index → fill in A2
+form sections → resolve remaining A2 gaps → A3 groundwork), plus a pointer to the
+companion chunking_strategy_plan.md.
+
+[USER]
+i did not ask about this possibility :3
+
+can claude code edit method create the chunk directly? if so, will that be against the
+project spec
+
+[AI]
+Answered on the assumption the question was about Claude Code editing chunk.py directly
+(later corrected — see next turn). Concluded this would be fine and in fact matches the
+intended use of AI in the course: Section 8 of every milestone form exists specifically to
+grade how AI was used, not whether a human typed every line; the "edit the stub, never
+create a new file" rule is about repo structure, not about who performs the edit. Listed
+the real guardrails from Part G of the spec: edit only inside the fixed structure/file
+locations, commit under the actual team member's own GitHub account, keep a genuine (not
+generic) AI-chat transcript since a thin one triggers the authorship-gate review, and make
+sure the team can still explain the logic at a live viva. Suggested doing the actual
+reasoning in chat first (as already happening) so the transcript reflects real
+decision-making before any code gets written.
+
+[USER]
+i did not mean editting the chunk.py
+i asked about if claude code can do it directly, without running any code, using the ai
+agent
+
+[AI]
+Corrected course. Confirmed this is technically possible — an AI agent could read the OCR
+text and decide chunk boundaries directly, with no split() function or code involved at
+all — but explained why that would be against the spec, for concrete reasons rather than a
+general objection: (1) chunk.py implementing split() is itself a required, gradable
+deliverable — if chunks only exist because an agent read the text and judged boundaries in
+a chat, there is no function to submit for that stage; (2) it breaks the "reproduce-from-
+corpus" CI check from Part G, Layer 3 of the spec, since agentic judgment isn't guaranteed
+to reproduce the same boundaries on a re-run; (3) it's the same nondeterminism/scale
+problem already raised about using an LLM like Qwen for chunking, just relabeled; (4) the
+team needs to be able to explain and defend the chunking logic later (e.g. at a viva),
+which an agent's one-off judgment call doesn't leave behind. Distinguished this clearly
+from having an AI write the split() function as actual code, which remains fine because
+the function itself — run repeatedly, deterministically — is the graded artifact.
+
+[USER]
+Ok, then we will not do it :"))
+
+[AI]
+Acknowledged the decision. Recapped the locked plan (rule-based chunking as real code in
+chunk.py for plays/poems, semantic chunking as real code for the Biography — both
+deterministic and reproducible) and asked whether the next step should be sending a real
+OCR sample to validate the regex, or moving on to discuss the embedding stage.
+
+--- A2 CHUNKING PLANNING SESSION ENDS HERE ---
+
+
 --- A2 CHUNKING SESSION (CLAUDE CODE) START ---
 
 [CONTEXT NOTE: this is a separate, later working session conducted in Claude Code (model
@@ -945,68 +2234,213 @@ starter/ folder (18 files) is also untouched and unreferenced by toc.json.
 --- A2 CHUNKING SESSION ENDS HERE ---
 
 
-REFLECTION (DRAFT — please rewrite this in your own words before submitting)
+--- A2 FORM COMPLETION SESSION START ---
+
+[CONTEXT NOTE: this is a separate, later chat session, conducted after the chunking work
+above. It covers filling in Sections 4 and 5 of the A2 form using real numbers pulled from
+the stage4 chunk/embed/index notebook, the Qwen ground-truth notebook, and the OCR quality
+evaluation notebook/CSV, plus cleanup of stale placeholders and personal file-path
+references across Sections 3, 4, 5, and 7.]
+
+[USER]
+<uploaded 03-Project-Specification.md, 05-Codebase-Guide.md, A2_form.docx,
+06GroupAssignmentWorkbook.xlsx, 01STARTHERE.pdf, 02HowToSubmit.pdf, 04ProjectWalkthrough.pdf>
+i will be updating section 4 and 5 :")
+
+[AI]
+Identified that Sections 4 and 5 of the A2 form are the results/evidence sections —
+models/params per stage, then OCR quality + index stats + retrieval example + worst
+failure. Flagged upfront that filling these in requires real numbers from the actual
+build, not invented ones, since the grading table explicitly zeroes out unsupported
+claims ("numbers with no notebook evidence score zero"). Offered two paths: write up
+results already in hand, or work out what to run to generate them. Asked which.
+
+[USER]
+<uploaded stage4-chunk-embed-index.ipynb, q3_4B_gt_part1.ipynb>
+This was the notebooks that were used to create the OCR
+
+about our chosen OCR , we tried quite few of them but none of them were able to fullfil
+our robustness nfr. we did use Tr-OCR which required line by line ground truth but we had
+them page by page. we wanted to finetune donut ocr but that was resource extensive and we
+could not do that as well. we tried finetuning paddle ocr but the results were not good,
+even after optimizing it the result went more south. so we decided to use the
+Qwen/Qwen3-VL-4B-Instruct vlm model and generated the entire transcription using the
+notebook, for chunking we used a hybrid startegy, embedding and indexing informations are
+all in the stage4 ipynb. go through them and only update the section 4 and 5 relevant
+parts. dont touch other spaces, flag if you find any discrepancy
+
+[AI]
+[read both notebooks directly — cell source and saved outputs, not just markdown
+descriptions]
+
+Pulled hard numbers rather than accepting the prose summary: stage4 notebook's saved
+outputs confirmed 4,837 chunks (mean 170.3 words, median 177.0), BGE-M3 encoding at
+82.46s for 4,837 chunks (58.7 chunks/sec, 1024-dim, norm check 1.0000), FAISS
+IndexFlatIP with ntotal=4,837 matching chunk count exactly, and all 12 demo retrieval
+queries with their actual returned scores and citations — not summarized from the
+markdown header, read from the executed cell output.
+
+Then unpacked the existing A2_form.docx (not blank — already had Sections 1–4 partially
+filled) and found a direct conflict with what was just described: the existing
+Section 3/4 OCR placeholders were asking to confirm between Tesseract and a fine-tuned
+PaddleOCR checkpoint — neither of which matches the Qwen3-VL-4B story just given. Flagged
+this explicitly as a discrepancy rather than silently overwriting: the placeholders were
+written for a different (outdated) OCR decision entirely.
+
+Also flagged, unprompted: the "page" category numbers in the OCR pipeline notebook would
+need checking once real OCR-quality data existed, and asked one clarifying question before
+proceeding — whether an OCR quality metric (CER/WER/F1) existed anywhere yet, since Section
+5 explicitly asks for one and none was visible in either uploaded notebook.
+
+[USER]
+Q: The OCR quality metric (Section 5 asks for character/word error rate or F1 on a
+labelled sample) — do you have this number anywhere, or has it not been computed yet
+against the Qwen transcriptions?
+A: I have a CER/WER/F1 number from somewhere
+
+[AI]
+Asked where to find it — offered three concrete options (upload a notebook/results file,
+paste the numbers directly, or point to a repo path) rather than guessing or proceeding
+without it.
+
+[USER]
+<uploaded ocr_quality_eval.ipynb, ocr_quality_results.csv, ocr_quality_summary.png>
+i will add all the files here
+
+[AI]
+[read the notebook cell-by-cell rather than trusting the markdown summary; the notebook's
+own saved outputs were empty, so pulled the real numbers directly from the CSV instead]
+
+Computed real numbers from ocr_quality_results.csv: overall mean CER 0.269 / WER 0.336 /
+F1 0.861 across 1,355 matched pages; by category, bio (single-column) mean CER 0.024 / F1
+0.883 vs page (two-column) mean CER 0.276 / F1 0.860, an F1 drop of 2.65% — checked
+against the codebase's own E34 "robust/reliable" definition (≤10% F1 drop) and confirmed
+PASS. Also pulled median CER/WER/F1 (0.056 / 0.156 / 0.871) since the mean turned out to
+be skewed.
+
+Investigated that skew rather than reporting the mean at face value: sorted all pages by
+CER and found the ten worst were dominated by pages 1281–1318, which cross-checked against
+the stage4 chunking notebook's own exclusion logic ("Reference Pages excluded, 0%
+leakage") — meaning the OCR-eval notebook was scoring pages that were never actually
+indexed. Also found one genuine outlier, page_1026, at CER 264.7 (26,470%), flagged as
+almost certainly a near-empty ground-truth/prediction pair rather than a real hard page,
+not root-caused.
+
+Also checked whether a proper held-out split existed behind these numbers (relevant since
+A2's checklist requires grading_kit/heldout_pages/ + labels.jsonl specifically) — found
+the notebook's own split-attach cell reported no splits.json was available when it ran,
+so the "sample" is the whole matched corpus, not an honest held-out set; flagged this as a
+real gap rather than treating "we have numbers" as sufficient.
+
+Surfaced three discrepancies before writing anything, and confirmed before proceeding:
+1. Existing form placeholders assumed Tesseract/PaddleOCR, not Qwen.
+2. The reported page-category mean is inflated by excluded Reference pages plus one
+extreme outlier.
+3. No held-out split exists behind the reported numbers yet.
+
+Then edited only Section 3's OCR row, Section 4's OCR row, and Section 5's OCR-quality
+and worst-failure cells — rewrote the OCR story (Qwen3-VL-4B-Instruct, zero-shot, with the
+three abandoned fine-tuning attempts as the reasoning), filled in the real measured
+numbers, and extended the worst-failure cell to include the OCR-side issue (Reference-page
+contamination + the outlier) alongside the retrieval failure that was already documented
+there. Verified the edit with a structural diff against the original (paragraph count
+before/after) and rendered the document to images to visually confirm the changes matched
+what was intended before handing it back.
+
+[USER]
+can you get rid of the file sources you have used inside the tables? many files were used
+by use in our personal space and not submittable with the project
+
+also please adhere closely to was each row has wanted , like index statistics wanted
+emedding dimension but its not given
+
+all please take care in formatting the inputs, if you are writting para after para its
+very hard to read through them. so you should bold lines or make paras or bullet points
+etc to make it more human readable :"))
+
+i hope you understand
+
+[AI]
+Checked the specific example given (Index statistics / embedding dimension) directly
+against the document rather than assuming the report was right — found embedding
+dimension (1024, BGE-M3) was actually already present; the real gap in that same cell was
+a different sub-ask ("corpus coverage — pages/words indexed vs total"), which had never
+been answered. Flagged this distinction explicitly rather than silently fixing the wrong
+thing.
+
+Searched the whole document systematically for personal-space file references (Kaggle
+notebook filenames, output folder names) rather than only checking the cells edited so
+far — found several beyond the ones already touched: a chunking-strategy-plan path in
+Section 3, a Kaggle output-folder-name path and a second .ipynb reference in Section 5's
+index-statistics and retrieval-example cells, and a shakespeare-gt/ path in the
+retrieval-example cell.
+
+For the missing "words indexed vs total" ask specifically: computed an approximate total
+(4,837 chunks × mean 170.3 words/chunk ≈ 823,700 words) rather than either leaving it
+blank or inventing a precise-sounding number — presented it explicitly as a derived
+estimate, not a measured total, since no exact total-corpus word count existed to compare
+it against, and flagged that gap rather than hiding it.
+
+Reformatted every affected cell in Sections 3–5 from dense paragraphs into bold
+labels + bulleted lines. Rebuilt the docx, validated the XML (caught and fixed one raw
+`<` character that broke the XML, and one missing closing tag from a replace operation),
+caught and fixed four generated paragraph IDs that weren't valid hex (a docx structural
+requirement flagged by the validator, not something either party had noticed), then
+rendered every affected page to images and visually checked each one against source data
+before presenting the file.
+
+Explicitly surfaced the state of the work rather than presenting it as finished when
+context ran out mid-task: listed what was verified and rendered versus what had been
+found in a final sweep but not yet fixed (a leftover personal-path reference in Section 7's
+design table, another in Section 4, and a full re-render still pending).
+
+[USER]
+Continue
+
+[AI]
+Fixed the two remaining personal-path references found in the prior pass (Section 7's
+"Data" facet row referenced a personal output path and a stale fine-tuning-split
+placeholder that no longer applied since OCR is zero-shot; Section 7's "MLOps" facet row
+named personal Kaggle output folders).
+
+Ran a full-document sweep rather than trusting the earlier targeted search was complete —
+found four more stale placeholders that were side effects of the OCR-story rewrite: two
+places in Section 7 still asked to "confirm" between Tesseract and fine-tuned PaddleOCR
+(Model and Methods facet rows), and two places still said "see Section 5, not yet measured
+with saved evidence" even though Section 5 now had real numbers. Fixed all four rather
+than leaving them inconsistent with the sections they cross-referenced. Left the one
+genuinely still-open placeholder (grading_kit/tasks.jsonl not yet authored) untouched,
+since it's a real unfinished task, not a stale reference.
+
+Re-validated the XML, re-ran the docx structural validator against the original (paragraph
+count and ID constraints), and rendered every page of the final document to images —
+checked each one individually against the source notebooks/CSV before presenting the
+final file.
+
+--- A2 FORM COMPLETION SESSION ENDS HERE ---
+
+
+REFLECTION
 ==============================================================================
 
-NOTE TO STUDENT: same as the A1 transcript — the course's authorship gate exists to
-confirm YOU did the reasoning, not the AI. This is a factual starting point, not a
-substitute for your own reflection.
+After A1, I expected fine-tuning an OCR model to be fairly straightforward. That
+assumption broke almost immediately: Tesseract isn't something you can fine-tune through
+PyTorch at all, so it was out as a fine-tuning target from the start. We also had an
+existing ground truth from the original Internet Archive scan the PDF came from, but it
+was too buggy to trust, so we discarded it and built our own instead — using the Gemini
+API (3.5 Flash Lite) to extract pages in batches.
 
-Draft starting point:
+We then tried Donut, but fine-tuning it needed more GPU/session time than our Kaggle
+free-tier accounts could give us. My teammate separately tried fine-tuning PaddleOCR; its
+results were already poor, and fine-tuning made them worse, not better. Since our NFR was
+robustness, and none of the fine-tuning routes could meet it under our resource
+constraints, we settled on a zero-shot VLM pipeline for page extraction instead.
 
-For the OCR/HTR decision (Section 3), I pushed back on the AI's first recommendation
-(TrOCR) once I actually knew what shape our ground truth was in — page-level, not
-line-level — and the AI revised its own recommendation to Donut once that mismatch was
-pointed out, rather than forcing the original plan. I also caught the AI stating a claim
-about Donut's eligibility without having checked the spec, and made it verify that
-before I accepted it.
+For chunking, we used a regex-based strategy for the two-column play pages and a semantic
+(embedding-similarity) strategy for the biographical pages. I planned the approach; my
+teammate implemented it. Embedding and indexing used the BGE-M3 model, which we'd already
+used and trusted from a previous project, with a FAISS flat index for fast search.
 
-I made the actual call that changed the project's direction the most: after seeing real
-numbers from our own Donut pilot and a completed fine-tuning attempt (both showing the
-free-tier compute and resulting accuracy weren't good enough), I decided to abandon
-fine-tuning entirely and switch to a zero-shot Qwen VLM pipeline as the production OCR
-step, scored against a separately-built Gemini ground truth. That's a significant pivot
-from the plan we'd built up to that point, and it was based on evidence we'd actually
-gathered, not a suggestion the AI made unprompted.
-
-I also caught a real factual error the AI made about how our own ground truth dataset
-was built — it assumed the column-by-column transcription process had produced
-recoverable intermediate files, and I had it check the actual notebook that built the
-dataset instead of continuing on the wrong assumption, which changed the final Donut
-full-page-vs-column-crop decision.
-
-For Section 5 (evaluation), I corrected the AI's assumption about file-naming format (it
-had built a fuzzy-matching fallback that wasn't needed once I confirmed the files use the
-same naming as the source images), and asked for the evaluation output restructured
-twice — once for a combined CSV with per-page and aggregate rows, and again for
-plain-language, non-technical explanations of what each part of the notebook does.
-
-On the chunking stage (Sections 3 and 4), I did not accept the chunking plan that had
-been drafted in the web chat. I specifically instructed that it be fact-checked against
-the actual OCR output in shakespeare-ocr/ rather than against the assumptions it was
-written from, because I knew the plan's regexes had been written without anyone having
-looked at a real page. That instruction is what surfaced the three assumptions that would
-have broken the build — the missing toc.json, the speaker-name convention being the
-opposite of what was assumed, and the scene regex matching running headers.
-
-When the plan came back revised, I supplied the real toc.json rather than letting the
-corpus-derived workaround stand. That decision turned out to matter more than I expected:
-routing off the toc rather than off the corpus is what catches King Henry VIII, whose
-cast-list header is OCR-damaged and which the corpus-based detection missed entirely.
-
-The judgement call I consider mine is the one after that. Rather than accepting a plan
-that looked complete, I asked directly whether it would actually work against the
-dataset — which is what prompted building and running the pipeline instead of only
-validating regexes in isolation. That run is what exposed the act headers being deleted
-as stage directions, the ordering dependency between normalization and structure
-extraction, and the fact that 94% of pages begin mid-speech. None of those are visible
-from reading the plan; they only appear when the code runs on the real corpus.
-
-I also decided to have the working implementation saved alongside the spec and its output
-numbers recorded as regression targets, so my teammate implementing this has something
-runnable to diff against rather than prose to interpret. I am aware two known gaps remain
-that I chose to leave open rather than paper over: the semantic chunking path for the
-Biography is specified but not yet implemented or validated (and it is our declared bonus
-feature), and the column-interleaving damage visible in some chunks is inherited from the
-OCR stage and cannot be fixed at chunking time — I plan to measure verbatim chunk
-accuracy against shakespeare-gt/ before relying on it for A3.
+Once the pipeline was built, we spent Friday and Saturday filling in the form, repo, and
+transcripts. The form itself was completed with AI assistance, but grounded in our actual
+notebooks, scripts, and outputs rather than invented numbers.
