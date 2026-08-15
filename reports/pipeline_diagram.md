@@ -26,9 +26,7 @@ shipped OCR corpus (`data/ocr_text/{page,bio}/*.txt`) that `vision/ocr.py` reads
 4 Kaggle notebooks covering page_0001-page_1318. Traditional OCR engines
 (Tesseract/PaddleOCR/EasyOCR/docTR) were benchmarked and rejected for catastrophic accuracy
 on this corpus's archaic typography — see `notebooks/eda.ipynb` Stage 4. See
-`configs/config.yaml`'s `ocr.model`. **Still open:** a saved CER/WER run of the shipped
-Qwen3-VL-4B-Instruct output itself against `grading_kit/labels.jsonl` — see the A2 form,
-Section 3/4's OCR rows.
+`configs/config.yaml`'s `ocr.model`. 
 
 **A documented assumption, not a detection:** `vision/layout.py`'s single- vs. two-column
 call is made per-*category* (Biography/Poem = single column, Comedy/History/Tragedy = two
