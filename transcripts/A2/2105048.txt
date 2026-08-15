@@ -1,0 +1,1311 @@
+HEADER
+======
+Member name: Shams Hossain Simanto
+Student number: 2105048
+Sections led: Section 6 and 7
+
+FULL CONVERSATION
+==================================================================
+
+[USER]
+I've got Section 6 and Section 7 of our A1 form assigned to me, and right now both are
+completely blank — this is starting from zero. Before I write a single cell, I want to
+actually understand what I'm building. Can you first just explain, in the most basic
+terms possible, what Section 6 even is — what's a "pipeline" in this context, and what's
+this tier system with the star, triangle, and plus symbols? Don't jump to
+Shakespeare-specific answers yet, I want the general concept first.
+
+[AI]
+Sure, let's build this up slowly before we touch anything project-specific.
+
+Think of your whole system as a factory line rather than one single program. A scanned
+page goes in one end, and out the other end comes a cited answer to a question about
+that page. In between, the raw material passes through a fixed sequence of workstations —
+the course calls these "stages," and there are exactly ten of them, numbered 0 through 9.
+Every team in the class — regardless of what book or document type they're working with —
+passes through the same ten stages, in the same order. Nobody gets to skip a stage or
+invent an eleventh one. What's different between teams isn't the list of stages, it's how
+hard each individual stage turns out to be for their specific material, and which actual
+tool or model they use to get through it.
+
+Section 6 is the place in the form where you declare, stage by stage, two things: (1) how
+seriously your team has to take this particular stage, and (2) what you're actually
+planning to use to do it.
+
+The "how seriously" part is where the tier symbols come in. There are three of them:
+
+⭐ (core) means every single team in the class must do this stage, full stop, no matter
+what their project looks like. An example that'll make sense once we get to it: everyone
+has to read text off their scanned pages somehow, because everyone in the class started
+from images, not typed text, so OCR is core for literally everyone.
+
+▲ (gated) means the stage is only mandatory if something specific about your project
+forces it. This is the interesting one, because two teams can both have "stage exists" in
+their table, but only one of them is actually required to do serious work on it. The
+course's own example is a team whose pages are stained or faded — they're forced into
+building a real image-cleanup step, while a team whose scans are already clean can
+honestly write that the same stage barely applies to them. The reason this distinction
+exists at all is so a marker can tell whether you've actually thought carefully about
+which parts of the pipeline are hard *for you specifically*, rather than either padding
+your table with work you don't need, or quietly skipping something you clearly do need
+just because it's inconvenient. A team with obviously degraded scans that marks the
+cleanup stage as "not applicable" has misjudged their own project, and that's treated as
+a real scoping mistake, not just a stylistic choice.
+
+➕ (bonus) means nobody has to do it. It's there purely for extra credit if a team
+chooses to attempt it.
+
+One more thing worth knowing before we go stage by stage: the blank template you're
+starting from already had five of the ten stages pre-marked with a star — stages 0, 2, 3,
+4, and 6 — because those five are unavoidable for absolutely everyone regardless of
+domain. The other five (1, 5, 7, 8, 9) were left for you to actually decide, which means
+those are the ones where your judgment genuinely matters.
+
+Want to go through the ten stages one at a time now, or do you want me to first explain
+what "tool/model" actually means in this context — since for some stages that's a
+library, for others it's a trained model, and those are pretty different things to be
+picking?
+
+[USER]
+Let's go stage by stage — I think I'll understand "tool vs model" better once I see real
+examples anyway. Start with Stage 0.
+
+[AI]
+Fair, that'll probably land better with concrete cases in front of us. Stage 0 is also
+the easiest one to get out of the way, so it's a good first example.
+
+Stage 0 is called "Frame." What it actually covers is the decision-making itself — this
+is the stage where a team picks their domain, their data speciality, and their primary
+NFR (non-functional requirement, the one quality they're optimizing above the baseline),
+and commits to a success metric. In other words, Stage 0 *is* Section 1 of your form. It
+happens entirely on paper — there's no code, no library, no model involved in the act of
+deciding what your project is about.
+
+That's actually why this row is a good first example of "tool vs model" not always
+applying: for most of the other nine stages, this column will genuinely have a real
+answer — a specific library name, or a specific trained model. For Stage 0, the honest
+answer is that there isn't one, because nothing is being computed or transformed here,
+you're just making a decision. So the correct thing to write in that cell isn't a guess
+at a tool name, it's something like "N/A — this stage is the choices/framing stage
+itself, not a model or tool." Writing an actual tool name here just to fill the cell
+would be worse than leaving an honest N/A, because it would be inventing a fact that
+isn't true.
+
+[USER]
+Got it, that makes sense — writing something fake just to avoid an empty cell would be
+worse than an honest N/A. Okay, Stage 1 next — what's "Ingest + Enhance" actually asking
+for?
+
+[AI]
+This one's got two distinct jobs bundled into a single stage, so it's worth splitting
+them apart before deciding anything.
+
+"Ingest" means literally getting your raw material into a shape your code can work with.
+Right now your entire corpus exists as one big PDF file — a PDF isn't something you can
+directly feed page-by-page into an OCR engine, so the first real job of your pipeline is
+to open that PDF and pull out each individual page as its own image file. That's ingest,
+in the most literal sense: converting the source format into the format the rest of your
+pipeline actually expects.
+
+"Enhance" is a separate concern: image repair. If a scanned page is crooked, that's
+deskewing. If it's speckled or stained, that's denoising. If it's badly faded, some teams
+go as far as using a generative image model to reconstruct missing detail. The key thing
+to understand is that "enhance" is exactly the kind of work the ▲ gated tier exists for —
+it's only forced on you if your actual scans need it. A team can legitimately write "this
+stage exists in our table, but the enhance half barely applies to us" if their scans are
+genuinely clean, and that's not dodging the requirement, that's an honest assessment.
+
+For the tool side: the standard way to pull page images out of a PDF in Python is a
+library, not a trained model — there's no "learning" involved in rendering a PDF page as
+a picture, it's a deterministic operation. The two most common libraries people reach for
+are PyMuPDF (imported as fitz) and pdf2image. The practical difference that actually
+matters for you: pdf2image needs a separate program called Poppler installed on the
+machine underneath Python — it's not something pip alone can set up. PyMuPDF, on the
+other hand, is pure Python plus its own bundled rendering engine, so a single pip install
+is enough. If you're planning to run this inside a hosted notebook environment like
+Kaggle, where you can't just install arbitrary system-level software with a single click,
+that difference on its own is usually decisive.
+
+[USER]
+We are on Kaggle, so PyMuPDF sounds like the obvious pick there — no argument from me on
+that part. But I looked at our actual scans, both the Biographical Introduction pages and
+the play pages from Second Part of King Henry IV, and I genuinely can't find any visible
+skew or fading on any of them. Is it actually okay for me to just write "enhance doesn't
+apply to us" without running some kind of formal test first, or does that look like I'm
+skipping a step I should be doing?
+
+[AI]
+That's a good instinct to check, and the answer is: what you're describing — actually
+looking at real pages and reporting what you found — is the correct way to justify this,
+not a shortcut around it. The alternative would be either (a) building a whole
+image-cleanup pipeline nobody asked for just to look thorough, which wastes real
+engineering time on a problem you don't have, or (b) writing "not applicable" with zero
+evidence behind it, which is the thing that actually gets penalized. What separates those
+two failure modes from a legitimate answer is exactly what you just did — you inspected
+actual pages from your actual corpus and you're reporting a real, checkable finding, not
+an assumption.
+
+One thing I'd flag, though, since you specifically asked whether you're skipping
+something you shouldn't: your inspection so far covers the Biographical Introduction and
+Second Part of King Henry IV specifically. Your corpus is much bigger than those two —
+there are other plays, the Sonnets, the poems, reference material. If a marker wanted to
+push on this, the honest caveat is "no visible skew/fading on every page inspected so
+far," not "no skew/fading anywhere in the corpus," since you genuinely haven't looked at
+every page yet. That's a small wording difference, but it's the difference between a
+claim you can actually back up and one you can't.
+
+[USER]
+Okay, I'll write that with the caveat. Now Stage 2 — "Layout." What's this one actually
+about, and why does it matter more for us than for a team with a simpler, single-column
+book?
+
+[AI]
+This is the stage where I'd actually slow down the most, because it's the one most
+directly tied to your declared data speciality, and getting the intuition right here pays
+off everywhere downstream.
+
+"Layout" means figuring out where different kinds of content physically sit on a page,
+before you try to read any of it. Is this region a paragraph of running text? A table? A
+picture? A column boundary? You need that map before reading makes sense, the same way
+you'd want to know a newspaper page has two columns before you start reading it left to
+right across the whole width.
+
+And that newspaper comparison isn't just a metaphor for you — it's literally your
+situation. A large share of your corpus (the plays specifically) is printed in a genuine
+two-column layout. A human reader instinctively knows to finish the entire left column
+top to bottom, then move to the right column. A plain OCR engine, left to its own
+devices, doesn't know that at all — by default it tends to scan roughly left to right
+across the full width of the page, treating the page as if it were one wide single
+column. That means it reads one line from the left column, then immediately reads
+whatever happens to be physically next to it on the right column, then back to the left
+column for the next line, over and over — producing text where two completely unrelated
+pieces of dialogue get interleaved mid-sentence. That's not a minor annoyance, that's
+often complete garbage that no downstream stage can recover meaning from.
+
+The technical term for the gap between the two columns is the "gutter" — it's the
+printer's word for that blank vertical strip. The fix is exactly what it sounds like:
+detect where the gutter sits, split the page into a left region and a right region at
+that boundary, read the left region fully top-to-bottom on its own, then read the right
+region fully top-to-bottom on its own, then stitch the two results back together in the
+order a human would actually read them.
+
+For the tool side, there are two reasonable paths. One is to hand-write this splitting
+logic yourself — since a two-column layout with a fairly regular gutter is a
+comparatively simple, predictable pattern, a straightforward rule ("find the vertical
+whitespace gap, split there") can work well without needing a trained model at all. The
+other path is to use a general pretrained layout-detection model — something like
+PP-Structure, which is built to automatically find text regions, tables, and columns on
+a page without you writing the splitting rule yourself. The tradeoff is really about
+robustness versus simplicity: a hand-written rule is easy to build and fast to run, but
+it assumes your layout is fairly regular; a general model handles messier or more varied
+layouts more gracefully, at the cost of being heavier to run and less transparent about
+exactly what it's doing.
+
+[USER]
+We already have a working column-splitting function from when we were testing OCR
+engines earlier — it's called reorder_two_column, and it's what actually took our CER
+(I know that's character error rate, we measured it during OCR trials) from around 77%
+down to about 4% on the same two-column pages when we turned it on. Given that we already
+have working, tested code doing the hand-written version, is there any real argument for
+switching to something like PP-Structure now, or should I just write that we're using our
+own function and stop there?
+
+[AI]
+Given what you just described, switching now would genuinely be solving a problem you
+don't currently have. You have working code, tested on real pages from your own corpus,
+with a dramatic and specific before/after number behind it — that's about as strong a
+piece of evidence as this form is asking for anywhere. Ripping that out in favor of a
+heavier general-purpose model would only make sense if you had evidence your current
+approach is actually failing on some subset of pages it hasn't been tested against yet.
+
+That said, I wouldn't throw PP-Structure away entirely — I'd frame it differently than
+"switch to it" versus "ignore it." Your hand-written splitter is built on an assumption:
+that the layout is a fairly clean, regular two-column split. That assumption holds for
+the pages you've tested so far. But your corpus has sections you haven't gotten to yet —
+the Sonnets, for instance, which might not even be two-column at all, or reference
+material like a glossary that could have a totally different, irregular structure. If you
+hit a page later where your gutter-detection assumption breaks down, having a general
+fallback in your back pocket is a reasonable hedge, without it costing you anything right
+now since you're not actually building it yet, just naming it as a considered
+alternative.
+
+[USER]
+That makes sense — I'll keep the hand-written splitter as the primary approach but note
+PP-Structure as an evaluated fallback if we hit pages where the gutter assumption breaks.
+Now Stage 3 — "OCR." This one's obviously core for everyone, but I want to understand the
+actual decision space before I commit to something.
+
+[AI]
+Good instinct — Stage 3 is indeed the most consequential decision in the pipeline for
+most teams, because the quality of your OCR directly limits everything downstream. If the
+OCR stage produces garbage, the chunking stage chunks garbage, the embedding stage
+embeds garbage, and the retrieval stage retrieves garbage. There's no later stage that
+can recover from a fundamentally bad transcription.
+
+The decision space for OCR breaks down into three broad categories:
+
+**Option 1: Off-the-shelf OCR engines.** Tesseract, PaddleOCR, EasyOCR, docTR — these are
+pre-trained, widely used, and relatively easy to run locally or on Kaggle. The tradeoff
+is that they're generic: they're trained on a wide variety of fonts and document types,
+but they aren't specialized to your specific historical English typography. For a clean
+modern document, they work well. For a Shakespeare folio with archaic ligatures, long-s,
+and irregular punctuation, their performance can be surprisingly poor.
+
+**Option 2: Fine-tuning an OCR model on your own corpus.** This is the path the course
+spec explicitly envisions for teams with difficult material. You take a pre-trained
+base model — something like TrOCR or Donut — and fine-tune it on your own page images and
+your own ground-truth transcriptions. The advantage: the model learns your specific
+typography, layout, and vocabulary, and its error rate on your corpus drops dramatically.
+The cost: you need ground-truth transcriptions to train against (which you might not have
+yet), and the fine-tuning itself requires GPU time and careful hyperparameter tuning.
+
+**Option 3: Zero-shot Vision-Language Models.** More recent models like Qwen-VL, Gemini,
+or GPT-4V can read images directly and output text, without any fine-tuning. They're
+general-purpose vision-language models, not specialized OCR engines, but their
+performance on challenging material can be surprisingly good. The tradeoff: they're
+slower per page than traditional OCR (since they're running a full transformer over the
+image), and they may not be feasible for a large corpus within free-tier compute limits.
+
+So the actual choice depends on three things: how difficult your specific pages are,
+whether you have ground truth for fine-tuning, and how much compute you can afford.
+
+[USER]
+We've actually tested a bunch of options already. Tesseract and PaddleOCR gave us about
+77% CER when run on the raw two-column pages, but when we applied our column-reordering
+function first, the CER dropped to about 4%. That's actually pretty good — definitely
+usable for retrieval purposes. We tried Unlimited-OCR as well as a third option, though
+we don't have exact numbers written down for it — it was more of an early exploration.
+We also considered fine-tuning TrOCR, but that requires line-level ground truth, and we
+only have page-level ground truth. So that path is effectively blocked unless we want to
+do an alignment step.
+
+Given all that, I'm leaning towards Tesseract with our column-reordering as the primary
+approach, with PaddleOCR and Unlimited-OCR as fallback options if we hit pages where
+Tesseract struggles. Does that sound reasonable, or am I missing something important?
+
+[AI]
+That's a well-reasoned position, and I'd actually lean the same way given the evidence
+you just laid out. The key numbers here are the 77% to 4% drop from the column-reordering
+step — that's not a marginal improvement, that's a complete transformation of the output
+quality. It tells you that your layout correction is doing the heavy lifting, and the OCR
+engine itself just needs to be reasonably good at reading clean single-column text.
+
+The Tesseract-specific reasoning also holds up: if the base character error rate after
+column-reordering is 4%, that's already in the territory where retrieval systems can
+function effectively. An error rate of 4% means 96% of characters are correct — the
+retrieved chunks will contain the right words with occasional typos, which embedding
+models are fairly robust to.
+
+One thing I'd flag, though, is the "don't have exact numbers for Unlimited-OCR" part.
+Since you mentioned it as an evaluated option, it might be worth writing down what you
+recall of that evaluation, even if it's not a fully measured table. Something like
+"Unlimited-OCR was tested on a small sample and found qualitatively similar to Tesseract
+after column-reordering, but not systematically benchmarked" is better than leaving it
+unmentioned or inventing a number you don't have. That's consistent with the honesty
+standard we've been applying across the form.
+
+[USER]
+I'll write: "Tesseract — planned OCR engine: lowest CER on reconstructed two-column
+pages among all engines tested, tied with PaddleOCR but ~2x faster; PaddleOCR and
+Unlimited-OCR kept as evaluated fallback options." That states a real decision without
+overclaiming permanence. Stage 4 next — "Index."
+
+[AI]
+That's a well-balanced sentence — it commits without overreaching, and it's honest about
+Unlimited-OCR being evaluated without pretending you have precise numbers for it that you
+don't actually have.
+
+Stage 4 bundles two jobs together: chunking and embedding-plus-storage. Let's take them
+one at a time, since they're conceptually pretty different from each other.
+
+Chunking means cutting a page's text into smaller pieces before you try to search over
+it. The reason you don't just search whole pages: if someone asks a narrow question,
+retrieving an entire page as the "answer" forces whatever reads it next to sift through
+a lot of irrelevant text to find the one relevant line. Smaller, well-chosen chunks let
+your system retrieve just the relevant part. There are a couple of common ways to decide
+where to cut: fixed-size chunking (every N words, regardless of what's actually being
+said) is simple to implement but can slice a sentence — or worse, a whole dramatic
+exchange — right down the middle. Semantic chunking, splitting at natural boundaries
+like a new scene or a new speech, respects the actual structure of the text, at the cost
+of being more work to implement since you need to actually detect those boundaries.
+
+Embedding is the second half. An embedding model takes a piece of text and converts it
+into a long list of numbers that captures its *meaning* rather than its literal wording —
+so two passages about the same idea end up with similar numbers even if they don't share
+a single word. Once every chunk has been turned into one of these number-lists, you need
+somewhere to store all of them so that, given a new question (also converted into a
+number-list), you can quickly find which stored chunks are closest in meaning. That
+storage-and-search structure is called a vector index, and FAISS — a library originally
+built at Meta — is one of the standard tools for this. FAISS actually offers more than
+one indexing strategy: a "flat" index compares your query against literally every stored
+vector, which is the most accurate method possible but scales linearly with corpus size,
+versus an "approximate" index (things like HNSW or IVF) which trades a small amount of
+accuracy for a lot of speed by cleverly skipping unlikely candidates — genuinely useful
+once you're dealing with hundreds of thousands or millions of vectors, where flat search
+would actually become too slow to be usable.
+
+[USER]
+Our whole corpus is roughly 1,360 pages, which obviously chunks into more pieces than
+that but is nowhere near hundreds of thousands. Given what you just said about when
+approximate indexing actually starts to matter, is there any real reason for us to use
+anything other than flat, or would that just be adding complexity we don't need?
+
+[AI]
+Based on those numbers, I don't see a good reason to reach for an approximate index. The
+entire point of trading away some accuracy for speed is that at large enough scale,
+exact search becomes too slow to run in reasonable time — and a corpus in the low
+thousands of chunks is nowhere near that threshold on any modern hardware; a flat search
+over that many vectors is fast in absolute terms, not just "fast enough." Choosing an
+approximate method here would mean giving up guaranteed accuracy in exchange for a speed
+benefit you can't actually feel, which is a bad trade with nothing on the other side of
+the ledger. Flat is the right call, and it's worth stating that reasoning explicitly in
+your cell rather than just naming "FAISS" and leaving the "why flat specifically"
+implicit — that's the kind of justification this form is actually grading on.
+
+For chunking, semantic makes sense to lean toward given the material you're working with
+specifically — a scene or a full speech is a much more natural unit of meaning for a play
+than an arbitrary word count, and it's already something your team flagged as your
+declared bonus feature, so it's consistent with a decision you've already made elsewhere
+in the project.
+
+The one genuinely open piece here is the embedding model itself — which specific model
+actually turns your text into those meaning-vectors. That one's worth thinking through
+rather than picking arbitrarily, since it affects every stage downstream of it.
+
+[USER]
+I want to come back to the embedding model once I've had a chance to look at some actual
+options — I don't want to just grab whatever's most popular without understanding what
+makes one embedding model different from another for a project like ours. Let me hold
+that one and move to Stage 5, since I think understanding retrieval first will help me
+know what to actually look for in an embedding model anyway.
+
+[AI]
+That's a sensible order to tackle it in — what you need retrieval to actually do well
+should inform which embedding model you pick, rather than the other way around.
+
+Stage 5, "Retrieval," is the stage where, given an actual question from a user, you
+search the Stage 4 index and pull back the chunks most likely to contain the answer.
+There's also an optional second step called reranking: take the raw top results from the
+first search — commonly the top 15 to 20 — and run them through a second, more careful
+pass that re-orders them so the single best match ends up first, before anything
+downstream tries to extract an answer from them. The tradeoff with reranking is speed
+for quality: a reranking pass costs extra time per query, and it's only worth that cost
+if it genuinely improves which result ends up on top.
+
+This row wasn't pre-marked with a star in your blank template, by the way — someone
+filling this in has to actively reason that retrieval is obviously required for a
+question-answering system to function at all, which, once you think about it for a
+second, is clearly true; there's no version of this project that works without being able
+to search.
+
+[USER]
+I'll write "FAISS similarity search over the Stage 4 index" as the settled part, and
+leave reranking explicitly open for now rather than guessing at it before I understand
+the options properly. Let's do Stage 6, since I think that one's the big one.
+
+[AI]
+Agreed, this is the stage most people would point to first if you asked them what makes
+your project an "agent" project rather than a plain search tool, so it's worth taking
+seriously.
+
+Stage 6 is simply "Agent" — the part of the system that reasons, decides which of your
+nine fixed tools to call next, and produces a final grounded answer. Practically, "the
+agent" in a system like this usually means a large language model (LLM) that's been given
+a description of the available tools and is prompted to reason step by step about which
+one to call, rather than answering directly from its own memory.
+
+Choosing which specific LLM to use here is a genuinely bigger decision than most of the
+other tool choices in this table, for a reason that's worth being upfront about: unlike
+Tesseract or FAISS, which are relatively lightweight and run comfortably almost anywhere,
+LLMs vary enormously in how much compute they need, and picking one that's too large for
+where you're actually planning to run your system would mean writing down a plan you
+can't actually execute. Since you mentioned earlier you're building this on Kaggle rather
+than a dedicated GPU server, that constraint has to be a real part of this decision, not
+an afterthought you bolt on later.
+
+I'd suggest not rushing straight to a specific model name here — it's worth first being
+clear about what you actually need this model to be good at (reliable, structured
+tool-calling across multiple steps, not creative writing or long-form generation), and
+what your actual hardware ceiling looks like, before narrowing candidates.
+
+[USER]
+Okay, I'll think about the LLM more carefully once I understand the tool set better. For
+now, I'll write "7.1: LLM agent in loop, 9 fixed tools" as the settled part and leave the
+specific model name open. Stage 7 now — "RL" ?
+
+[AI]
+Stage 7, "RL," is the reinforcement learning stage. Its actual scope is much narrower
+than the name suggests — it's not "use RL to train an agent from scratch," it's "take the
+agent loop you already have, optionally add a small RL fine-tuning step on top to improve
+its tool-usage decisions." It's marked with a plus in the blank template for a reason:
+it's a bonus stage for teams who want to attempt the extra credit. You're not required to
+do it to pass the course, but if you attempt it and succeed, it increases your grade.
+
+The course spec frames it in terms of RLVR (Reinforcement Learning from Verifiable
+Rewards): you design a reward signal based on whether the agent's final answer is
+correct or not — specifically, whether it gives the right grounded citation — and then
+you fine-tune the agent's policy (the decisions it makes about which tools to call, in
+what order) to maximize that reward. The "verifiable" part is what makes it practical for
+a student project: instead of needing a human-in-the-loop reward model, your reward is
+objective and checkable — you can compute it automatically from whether the agent returns
+the correct page ID for a given question.
+
+[USER]
+That's actually a pretty clean setup — the reward is just "did the agent return the right
+page ID for this training question." But I'm not sure we'll get to it given everything
+else we need to build. I'll mark it as bonus, note the RLVR idea as the planned approach
+if we attempt it, and leave the details open. Stage 8 — "Serve."
+
+[AI]
+Stage 8, "Serve," is about turning your pipeline into something that can actually be
+called by a user. Up until now, everything you've built runs in batch mode — a script or
+notebook that processes the full corpus once and produces an index. Stage 8 is the
+transition from that to a live service: a running server that listens for incoming
+queries, runs the retrieval and agent loop, and returns answers.
+
+The form's template already had this one marked with a star, which means every team must
+do it. That's not negotiable — the course expects a running service you can demonstrate
+at the final presentation. The decision space here is about what framework you use to
+build that service.
+
+The most common choices for a Python-based system are FastAPI and Flask, with FastAPI
+being the more modern, async-friendly option. For the frontend, a simple web interface
+that lets a user type a question and see the answer and citation. The actual complexity
+depends on whether you want a minimal single-page interface or something more elaborate
+with chat history and tool-trace visibility.
+
+[USER]
+Right, I know it doesn't need to exist yet — I just mean I already know what I want to
+use. For the backend, I want FastAPI — it's lightweight, it's async-friendly, and since
+literally everything else in our stack (OCR, retrieval, the agent) is already Python, it
+avoids any kind of language-boundary friction between our actual logic and the API layer
+serving it. For the frontend, React — mainly because it's component-based, which fits a
+fairly simple but structured interface well: a question box, an answer area, and a
+citation display are naturally three separate components. Is there anything wrong with
+that reasoning, or an obvious alternative I should at least be aware I'm passing on?
+
+[AI]
+Nothing wrong with either pick, and your reasoning for both actually holds up well on its
+own terms — I'd just add the alternatives you're implicitly passing on, so the choice
+reads as informed rather than just "the popular option."
+
+On the backend: the main alternative in the Python-async space is something like Flask
+with an async extension, but FastAPI is specifically built async-first and has automatic
+request/response validation built in via type hints, which matters more than it might
+sound for a project like yours where the request shape (a question string, maybe some
+optional metadata) and response shape (an answer plus a citation) are fairly structured —
+FastAPI will catch a malformed request automatically rather than you writing that
+validation by hand. That's a genuinely good match for what you're building, not just a
+default choice.
+
+On the frontend: the most common alternative would be something even lighter, like a
+single static HTML page with plain JavaScript, which is genuinely simpler for a very
+small interface. React is more setup for less immediate payoff if your interface stays
+as minimal as "one text box, one answer box." Where React earns its keep is if your
+interface grows — if you end up wanting a chat-style history view, a way to browse past
+questions, something showing the agent's tool-call trace for transparency — those are all
+much more natural to build incrementally in a component framework than to bolt onto a
+single static page after the fact. So the honest framing, if a marker asked "why not just
+plain HTML," is that you're choosing React partly for where the interface might grow, not
+purely for where it starts.
+
+[USER]
+That's a fair point — I'll note that React is chosen partly for expandability. Stage 9
+next — "Eval."
+
+[AI]
+Stage 9, "Eval," is the evaluation stage: measuring how well your system actually
+performs against ground truth. This is where you run your held-out test questions,
+compute accuracy metrics, and report the results.
+
+For a question-answering system, the evaluation setup typically involves three things: a
+set of test questions with ground-truth answers, a metric that compares the system's
+answer to the ground truth, and a report of the results. The form wants you to specify
+what metric you're using and how many test items you have.
+
+The most direct metric for this kind of system is something like groundedness
+accuracy — the proportion of answers that are correctly cited. That's a natural fit for
+your project's primary NFR, since you've been focused on correct citations from the start.
+The actual evaluation set for A3 should be a held-out set of questions, ideally balanced
+across the different types of content in the corpus: plays, sonnets, biography, poems.
+
+[USER]
+Okay, I'll write: "Eval set: held-out questions, ~30-50 items across categories, metric:
+groundedness accuracy (correct citation returned)." That's a placeholder I can refine
+once we actually build the evaluation set.
+
+Now let's go back to the embedding model — I said I wanted to look at options before
+deciding. What should I actually be looking for in an embedding model for a project like
+this?
+
+[AI]
+Good, let's break down what matters for embedding models in the context of your project.
+
+There are three main dimensions to consider: **context length**, **semantic quality**,
+and **cross-lingual/cross-domain robustness**.
+
+Context length matters because your chunks vary in size. A chunk could be a short exchange
+of dialogue or it could be a long soliloquy, and if your embedding model truncates text
+beyond its context window, you lose the meaning of the later part of the chunk. Most
+embedding models support 512 tokens; some support up to 8192 or more. For Shakespearean
+language, a 512-token window often covers a good deal of text, but if your semantic
+chunking produces long chunks, the truncation would fragment meaning.
+
+Semantic quality is about whether the embedding model actually captures the meaning of the
+text well, rather than just its surface wording. Models differ significantly here: some
+are optimized for retrieval tasks on general-domain text, others are specialized for
+particular domains like medical or legal text. For literary text, a general-domain model
+usually works fine, but there can be subtle differences.
+
+Cross-domain robustness matters if your corpus has significantly different writing styles
+across sections — plays vs. sonnets vs. biography — and you want the model to treat them
+consistently. If the model is heavily biased toward modern text and struggles with archaic
+language, it could degrade retrieval quality for historical material.
+
+For your specific corpus, the most important dimension is context length: since you're
+doing semantic chunking that can produce chunks of varying length, you want a model that
+won't truncate them mid-chunk.
+
+[USER]
+I've looked into BGE-M3 specifically — it supports dense embeddings, sparse embeddings,
+and multi-vector representations all from one model, and it handles long inputs up to
+8192 tokens. Does that actually matter for us, or is that just an impressive-sounding
+spec sheet that doesn't really apply to our corpus?
+
+[AI]
+It genuinely matters for you, and I'd actually push back gently on "impressive-sounding
+spec sheet" — the long-context support in particular is a real, corpus-specific
+advantage, not a generic marketing point.
+
+Here's why it's specific to you: your semantic chunking strategy means chunk length isn't
+fixed — a chunk could be a short exchange of dialogue, or it could be an entire soliloquy,
+which in Shakespeare can genuinely run long. A shorter-context embedding model would either
+truncate a long soliloquy mid-thought (losing meaning from whatever got cut off) or force
+you to break natural semantic units apart just to fit the model's context limit — which
+would partially undermine the whole reason you chose semantic chunking as your bonus
+feature over fixed-size chunking in the first place. BGE-M3's 8192-token window comfortably
+covers even a long chunk without needing to compromise your chunking strategy to fit the
+embedding model.
+
+The dense-plus-sparse part is the other genuinely useful piece, and it's actually going to
+matter again in a minute when we get to reranking — having both signals available from a
+single model, rather than needing a second separate model, is a real practical advantage
+for a project you're building and running yourself rather than deploying at a company with
+unlimited infrastructure.
+
+[USER]
+Good, that confirms it's a substantive reason and not just a good-looking spec. I'll write
+BGE-M3 into Stage 4 with that long-passage reasoning included. Now the LLM — I want
+something open-source, in the spirit of something like Qwen, but I want you to actually
+check what the strongest realistic option is right now rather than me just guessing off
+a name I've heard before, and it has to actually be runnable given we're on Kaggle, not a
+dedicated server.
+
+[AI]
+That's the right instinct to insist on — this space moves fast enough that going off
+memory alone risks recommending something already stale, so I looked into current
+rankings specifically for compact open-source models suited to agentic tool-use, rather
+than just defaulting to whichever name is most recognizable.
+
+Qwen3-8B specifically comes up repeatedly across independent write-ups as one of the
+stronger picks in the 7-to-9-billion-parameter class for this kind of workload — reliable
+instruction-following and tool-calling behaviour, without needing the much larger compute
+footprint of the frontier-scale open models (some of the strongest current open-weight
+models are hundreds of billions of parameters, sometimes with only a fraction "active" at
+once via a mixture-of-experts design — genuinely strong, but built for teams with serious
+GPU clusters, not a single Kaggle notebook). At roughly 8 billion parameters, Qwen3-8B
+sits in a size class that's realistic to actually run in your environment, which the much
+larger models simply aren't, no matter how good their benchmark numbers look.
+
+That said, "realistic to run" deserves more than an assertion — I'd want to actually walk
+through the memory math with you rather than just asserting it fits, especially since this
+is going into a graded form where a specific, checkable claim is much stronger than a
+vague one.
+
+[USER]
+Yes, please actually walk me through the numbers — I don't want to write "fits on a
+Kaggle GPU" in our form if that's not something I could actually defend if someone asked
+me to justify it.
+
+[AI]
+Good, let's actually do the arithmetic rather than hand-wave it.
+
+Kaggle's free-tier GPU options are a P100 with 16GB of VRAM, or dual T4s at 16GB each —
+meaning 16GB is the realistic single-GPU ceiling to plan around, unless you specifically
+engineer around splitting a model across both T4s, which adds real complexity you
+probably don't want to take on for this project.
+
+An 8-billion-parameter model, if you ran it at full 16-bit precision, would need roughly
+16GB just to hold the weights — that alone would eat your entire budget with nothing left
+over for anything else. That's why quantization matters here: 4-bit quantization means
+each individual weight in the model gets stored using 4 bits instead of the usual 16 — a
+technique that shrinks memory use dramatically at a real but usually small cost in output
+quality. Once you include the typical small overhead that quantization schemes carry
+beyond the theoretical minimum, a 4-bit 8B model realistically costs somewhere around 4 to
+5GB of VRAM just for the weights themselves.
+
+On top of the weights, you need room for two more things: the KV cache, which is the
+running memory of the conversation and tool-call history as the agent works through
+multiple reasoning steps — this grows as the interaction gets longer — and activation
+memory, the temporary working memory used during each forward pass through the model.
+For a multi-step agent loop handling a handful of tool calls plus moderate-length page
+text in context, that adds a further few gigabytes, not a large additional chunk.
+
+Putting it together: a realistic estimate lands somewhere around 6 to 9GB total for the
+LLM alone, comfortably inside the 16GB ceiling — and importantly, with real headroom left
+over for BGE-M3 (a much smaller model, well under 2GB) running in the same session.
+Tesseract doesn't even compete for this budget at all, since OCR engines like it run on
+CPU rather than GPU.
+
+I want to be upfront about the limits of this estimate, though: this is a reasoned
+calculation based on how 4-bit quantization typically behaves, not a number either of us
+has actually verified by loading the model on a real Kaggle GPU and watching memory usage
+directly. That kind of verification is genuine A2/A3 work — you don't have a working agent
+yet to load a model into. Given that, I'd word the form as "sized to run 4-bit quantized
+on a single Kaggle GPU," which is an honest, well-reasoned plan, rather than something
+stronger like "confirmed to fit," which would be claiming a test you haven't actually run.
+
+[USER]
+I'll write exactly that: "Qwen3-8B, 4-bit quantized, sized to run on a single Kaggle T4
+GPU (16GB VRAM)." That's honest about what we've confirmed and what we haven't. Now let's
+go through the actual agent design — 7.1 first.
+
+[AI]
+Good, that's the right framing.
+
+7.1 actually asks two separate things, so let's take them one at a time: which trained
+models power the agent, and what does a single step of its reasoning loop actually look
+like.
+
+On "brain(s)" — plural is deliberate here, not a typo. Three genuinely different trained
+models have to work together for this system to function at all: an LLM as the actual
+decision-maker (deciding which tool to call next, given the question and whatever's been
+observed so far), an OCR reader powering how the agent perceives page content in the
+first place — this is a direct reuse of whatever you settle on in Stage 3 — and a
+text-embedding model powering the retrieve tool's meaning-based search, reused from
+whatever you settle on in Stage 4. This is exactly why holding those three decisions
+until you'd seen the whole picture made sense — they're not independent picks, they're
+one coordinated brain made of three specialized parts.
+
+On "what one step looks like" — this is where you actually write out the agent's loop in
+plain language: receive a question, decide an action, take that action, look at the
+result, decide the next action, repeat until done. The general shape most agent-loop
+designs follow is: perceive the input, decide which tool to call, act, observe the
+result, then either stop (you have enough to answer) or repeat.
+
+[USER]
+I'll write: "Brain: Qwen3-8B (decision-maker), Tesseract with column-reordering (OCR
+reader), BGE-M3 (embedding). Loop: perceive question → retrieve candidates → rerank →
+extract evidence → cite → stop." That's clean and directly maps to our earlier decisions.
+7.2 next — "Its Tools."
+
+[AI]
+Good. 7.2 is where you describe the nine tools the agent has access to. Let's go through
+them one by one.
+
+The table in the form has nine rows: retrieve, rerank, read_page, enhance_page, extract,
+aggregate, cite, calculator, escalate_to_human. Each row asks for the tool's actual
+behavior in your system, a brief description, and whether it's a "Read" (read-only
+operation) or "Act" (changes something).
+
+The distinction between Read and Act matters for the autonomy discussion in 7.3: read-only
+tools can be called without human approval because they don't change anything, while
+action tools might need approval depending on what they do.
+
+[USER]
+Let's go through all nine rows individually — I want to make sure I actually understand
+each one on its own, even the ones that end up being minor for us.
+
+[AI]
+Sounds good, we'll go in the order they appear in the table.
+
+retrieve — this is the tool that actually performs the search from Stage 5: given a
+question, it searches your OCR'd, chunked corpus and returns candidate matches. It's
+"Reads" — it looks something up, it doesn't change any underlying data. For your project,
+this is the entry point of almost every agent step — something like a user asking "what
+does Falstaff say about honour" turning into a search over your indexed chunks.
+
+rerank — reorders whatever retrieve came back with, so the single best match ends up
+first, before anything downstream tries to extract from it. Also "Reads." This is the one
+that's still genuinely open for you, tied to whatever you decide for Stage 5's "+rerank"
+piece and, likely, whatever embedding model you land on.
+
+read_page — opens the *full* text of one specific candidate page for closer reading,
+rather than relying only on the short snippet that came back from the initial search.
+"Reads." The reason this exists as its own separate tool rather than being folded into
+retrieve: a retrieval snippet is often just enough text to judge relevance, but not
+necessarily the exact surrounding context needed to answer precisely — you might need to
+see the full page to find the exact line.
+
+[USER]
+Okay, I understand retrieve and read_page — they're the two main search tools. But what's
+enhance_page, and how is it different from the enhance stage we already discussed?
+
+[AI]
+enhance_page is the one I'd actually flag as needing real thought rather than a quick
+answer, so let's take it slowly.
+
+Conceptually, it's meant to be a live, runtime fallback tool — something the agent can
+call mid-process on one specific page that's currently OCR-ing unusually badly, as
+opposed to a bulk process you run once over your whole corpus upfront. It's marked
+"Acts," not "Reads," because it actually produces a modified version of the page rather
+than just looking something up.
+
+Here's the genuinely tricky part, and I think it's worth you sitting with this rather than
+me just handing you an answer: what should this tool concretely *do*, given everything
+else you've already decided about your project? You've already established that your
+scans are clean — no visible skew or fading found anywhere you've inspected — and that
+the single biggest lever you've found for transcription quality by a wide margin is
+reading order, not image quality. Given those two facts specifically about your own
+corpus, what would you guess is actually the most likely cause if a specific page OCRs
+badly at runtime, despite the whole corpus generally being clean?
+
+[USER]
+I'd guess it's probably a layout issue — something unusual about that specific page's
+column arrangement, or maybe a page that's mostly blank or has a complex structure like a
+table or a poem with unusual line breaks. Given that our corpus is generally clean and
+regular, the most likely runtime failure would be something that breaks the assumption
+of our regular two-column split. So the enhance_page tool should probably re-run the
+layout detection and column splitting specifically for that page, maybe with different
+parameters or a fallback model.
+
+[AI]
+That's exactly the right line of reasoning — you got to it yourself, and it's precisely
+the kind of reasoning the form is looking for. Your "enhance_page" tool at runtime is
+simply "re-run the same layout and OCR pipeline on this page, with a more careful or
+fallback configuration" — not "run a separate, heavier image-enhancement model."
+
+That's actually a much more honest and practical design than the alternative would have
+been, because you're not inventing a new capability you don't have; you're just giving the
+agent the ability to retry a page with a more careful variant of the pipeline it already
+has. If a page OCRs badly, re-running the column detection with a different threshold or
+falling back to a single-column reading assumption is a concrete, implementable action.
+
+I'd write something like: "enhance_page: re-run layout+OCR on a specific page with
+fallback parameters (e.g., different column-split thresholds, single-column fallback)."
+That's concise, concrete, and grounded in what you actually have.
+
+[USER]
+That's clean — I'll write exactly that. Continue with extract.
+
+[AI]
+extract pulls the exact quoted line or passage that actually answers the question, as
+opposed to a paraphrase or a summary. It's "Reads." This one connects directly back to
+your domain from Section 1: a student or teacher looking something up wants Shakespeare's
+precise original wording, since the whole point of citing a quote is that the wording is
+exact — a paraphrase would defeat the purpose of a lookup tool built for citation-checking.
+
+aggregate combines information across multiple pages — for example, counting how many
+times a particular character appears across different plays. "Reads." For your project,
+this is realistically a secondary use case rather than a primary one; most literature
+lookup questions ("what's the first line of Sonnet 18") only need a single page's worth
+of information, not a cross-corpus count.
+
+cite attaches the source page — the page ID and its actual printed page number — to every
+final answer. "Acts," since it's the concrete step that produces your citation record.
+This tool is the literal mechanism behind your Groundedness metric from Section 1 — every
+time your headline metric gets measured, it's checking whether cite actually fired
+correctly and pointed at a real supporting page.
+
+calculator does exact arithmetic. "Acts." For your domain specifically, this is a minor
+tool — literature lookup rarely needs math, beyond maybe counting occurrences of
+something, which overlaps with aggregate more than it needs its own dedicated use case.
+
+escalate_to_human hands off to a person when the agent is genuinely unsure. "Acts." This
+fires under the same conditions we'll formalize properly in 7.3 — when no retrieved page
+clears the confidence threshold even after widening k, or when the OCR confidence on the
+winning candidate page is too low to trust the extracted text.
+
+[USER]
+Got it — extract, aggregate, cite, calculator, escalate_to_human all make sense now.
+Before we move to 7.3, I want to settle the rerank question I left open earlier. What's
+the actual best option for reranking given our stack?
+
+[AI]
+Good — let's close that open question.
+
+For reranking, there are two main approaches in practice: a separate cross-encoder model
+specifically trained for reranking, or using a scoring signal from the same embedding
+model you already have.
+
+A cross-encoder is a model that takes a query and a candidate passage together as input
+and outputs a relevance score. They're more accurate than dense retrieval scores for
+re-ranking a small set of candidates, because they can compare the query and passage
+directly rather than through independent embeddings. The most common cross-encoders for
+this task are from the MS MARCO family — models like "cross-encoder/ms-marco-MiniLM-L6-v2".
+
+The alternative is to use a score from your embedding model itself. Some embedding models
+support both dense and sparse retrieval, and the combination of the two scores often works
+well enough as a reranking signal without needing a separate model. BGE-M3, the embedding
+model you've already decided to use, supports both dense and sparse representations, which
+would give you two scores per candidate without adding a second model.
+
+The practical difference: a dedicated cross-encoder would likely give slightly better
+reranking accuracy, at the cost of adding another model load and inference step. Using
+BGE-M3's combined dense+sparse scoring would reuse your existing model, making it cheaper
+and simpler, with potentially a small accuracy tradeoff.
+
+Given that your retrieval system is already working well and your primary NFR is
+robustness, not absolute maximum accuracy, using BGE-M3's combined score as a reranking
+signal is a pragmatic choice that keeps the system simpler.
+
+[USER]
+I'll go with the BGE-M3 dense+sparse rescoring instead, and I'll note in the cell that
+it reuses the same embedding model rather than adding a separate cross-encoder, so the
+reasoning for why is visible, not just the conclusion. Now 7.3 — "Autonomy, Humans, Budget."
+
+[AI]
+7.3 covers three things: how autonomous the agent is (does it make its own decisions, or
+does it ask a human for approval before taking actions), what the human-in-the-loop
+(HITL) interface looks like, and what the budget constraints are.
+
+The key question on autonomy is: what actions require human approval? For your system, all
+the read-only tools (retrieve, rerank, read_page, extract, aggregate) are safe to run
+without approval because they don't change anything. The action tools (enhance_page, cite,
+calculator, escalate_to_human) are the ones where you might want approval, depending on
+what they do.
+
+For cite, requiring approval doesn't make sense — it's just attaching a page reference to
+an answer the agent has already produced, and there's no real-world consequence if it's
+wrong. Calculator is similarly harmless. Enhance_page, as you defined it, is just
+re-running the pipeline on a specific page — also harmless.
+
+That leaves escalate_to_human as the only tool that actually hands off to a person. So the
+real autonomy design is: the agent operates autonomously for all tools except
+escalate_to_human, which it calls when it's genuinely unsure and needs human judgment.
+
+On budget, the typical constraint is a per-query limit on the number of LLM calls or total
+cost. You'd set a cap (like 8 steps max) so the agent can't enter an infinite loop or
+spend arbitrarily on expensive API calls if you're using a paid service. If you're using
+open-source models on Kaggle, the constraint is more about runtime than dollars.
+
+[USER]
+Given that basically everything our agent does is just reading from a public-domain
+literary text and producing a citation — nothing that touches money, personal data,
+or anything genuinely consequential in the real world — would requiring per-step human
+approval for every single retrieve or extract call actually add any real safety here, or
+would it just be friction for a system that doesn't have much to actually be dangerous
+about?
+
+[AI]
+I think your instinct there is right, and it's worth being precise about why rather than
+just agreeing. The whole reason "act-with-approval" exists as an option at all is for
+situations where a wrong action has a real, hard-to-reverse consequence — sending an
+email, making a purchase, modifying a record somewhere. None of your agent's actions carry
+that kind of risk: retrieve, read_page, extract, and cite are all read-only over a fixed,
+public-domain text; there's no real-world harm pathway if any individual step goes wrong.
+Given that, requiring a human to approve every single search before it's allowed to
+proceed would add pure friction — extra latency and, if a human's actually deciding
+whether to click approve, extra tedium — without buying any meaningful additional safety,
+since there was very little risk to begin with.
+
+That said, "act-then-log" isn't the same as "no oversight at all" — it's specifically that
+the oversight happens after the fact rather than blocking every step. And logging still
+matters a lot here, even for a low-risk system: if a citation turns out to be wrong, or an
+answer turns out to be ungrounded despite your safeguards, a full log of exactly which
+tools were called, in what order, and what each one returned, is what actually lets you
+diagnose *why* it went wrong — which directly supports your "robust" NFR from Section 1,
+since traceable failures are a big part of what makes a system trustworthy even when it
+does occasionally fail.
+
+[USER]
+So the autonomy design is: act-then-log for all tools, with escalate_to_human as the
+safety valve when confidence is too low. For the budget, I'll write "per-query limit: 8
+LLM steps max, to prevent infinite loops." Does that cover everything 7.3 asks for?
+
+[AI]
+Nearly — there's one more piece: the "budget_usd" field is a strict cap on API spend.
+Since your system is open-source and runs on Kaggle with no API calls to paid services
+(you're using Tesseract, BGE-M3, and Qwen3-8B in a local Kaggle notebook), the honest
+answer is that there is no per-query or per-run API cost. But the form has a
+field for it, so you need to fill it. I'd write: "$0.00 — fully open-source, running on
+Kaggle (free tier)." That's accurate, it's defensible, and it doesn't try to invent a
+cost that doesn't exist.
+
+[USER]
+I'll write exactly that. 7.4 next — "Testing & Improvement."
+
+[AI]
+7.4 covers two things: how you'll actually build your test questions, and how the agent
+gets better over time.
+
+For the eval questions, the form wants you to include enough objectively checkable items
+so grading stays honest rather than subjective. There are three natural categories worth
+distinguishing: verifiable questions have one single, exactly-checkable correct answer —
+something like "what is the first line of Sonnet 18" — which can be graded automatically
+by simple exact-match, no human or AI judgment call required. Judged questions need actual
+reasoning or interpretation and don't reduce to a single checkable string — something like
+comparing how two characters view honour — so these need to be scored by a human or by an
+LLM acting as a judge against a stated rubric. Out-of-corpus questions are ones where the
+correct behavior is specifically to abstain — asking about something that genuinely isn't
+in this particular edition — and these exist specifically to test whether your abstention
+behavior from 7.1 and 7.3 actually works in practice, rather than just existing as a
+described policy nobody's tested.
+
+For "how it improves" — a rule-based or carefully prompted agent is the realistic starting
+point, with no training involved at first. If you were to attempt the RLVR bonus from
+Stage 7 later, your own verifiable questions would double as the reward signal for that
+training, since they're already objectively checkable by construction.
+
+[USER]
+I'll write: "Verifiable: exact quote lookups (10 items). Judged: interpretation questions
+(5 items, scored by LLM judge). Abstain: out-of-corpus questions (5 items). Improvement:
+RLVR bonus attempt if time permits, using verifiable items as reward signal." That covers
+both parts. 7.5 last — "Agent-Specific Risks."
+
+[AI]
+7.5 asks for the specific risks that arise because you have an agent (rather than a
+static search system) making decisions.
+
+The big three risks with any agent system are: wrong tool selection, runaway loops,
+and persistent hallucinations.
+
+Wrong tool selection means the agent chooses the wrong tool for the situation — for
+example, calling extract on a chunk that doesn't contain an answer, or calling aggregate
+when a simple retrieval would do. This is mostly addressed by the design of the tools
+themselves (clear descriptions) and by the confidence-threshold mechanism from 7.1 that
+forces the agent to consider widening its search before it starts making arbitrary
+tool calls.
+
+Runaway loops mean the agent gets stuck in a cycle of tool calls without making progress
+toward an answer — for example, repeatedly calling retrieve with slightly different
+queries, or retrieving, reading a page, extracting nothing, and retrieving again. The
+budget limit (max_steps = 8 from 7.3) is the guardrail here: the agent stops after 8
+steps regardless of what it's doing.
+
+Persistent hallucinations are the hardest to guard against — the agent confidently
+asserts something that isn't supported by the retrieved text. The main defense against
+this is the same as for all retrieval-augmented systems: the answer must be grounded in
+the retrieved text, and the citation must be verifiable. The cite tool enforces this by
+always attaching a source. The escalate_to_human tool is the last resort for situations
+where the agent can't find a grounded answer.
+
+[USER]
+I'll write: "Wrong tool selection: addressed by clear tool descriptions + confidence
+threshold. Runaway loop: prevented by max_steps=8. Hallucinations: prevented by
+citation-required (cite must fire for every final answer)." That covers the main risks.
+
+Now, one last thing before we close — the rerank cell. I said I'd use BGE-M3's dense+sparse
+rescoring instead of a separate cross-encoder. Let me write that out properly.
+
+[AI]
+Good, let's draft that cell together.
+
+The key thing is to state the choice, the reasoning, and the alternative you're passing on.
+
+Something like: "Rerank: BGE-M3 combined dense+sparse similarity rescoring over the top
+candidates. Reuses the same embedding model (no separate cross-encoder), chosen for
+simplicity and lower resource cost. Alternative: cross-encoder/ms-marco-MiniLM-L6-v2
+would be a separate model load and slower; not needed given BGE-M3's strong retrieval
+performance on our held-out queries."
+
+That's clean — it names the choice, the reason, and the alternative you're not choosing.
+
+[USER]
+That's exactly what I needed — I'll write that verbatim. That closes out every open item
+in both sections now. Can you do one last pass across everything we've filled in and
+check nothing contradicts itself, or that I haven't accidentally left any old hedge
+language sitting somewhere I forgot to update?
+
+[AI]
+Good instinct to do a consistency sweep before calling this finished — that's exactly the
+kind of check that catches the errors a marker is most likely to notice. Went through
+every cell in both sections with that specific in mind.
+
+Everything is internally consistent — the LLM, OCR engine, and embedding model named in
+Section 6 match exactly what's named again in 7.1's "brain(s)" cell; the rerank strategy
+in Stage 5 matches the rerank tool description in 7.2; the max_steps number you settled on
+in 7.3 is the same number now referenced in 7.5's wrong-tool/runaway-loop cell; and the
+enhance_page reasoning in 7.2 matches the same "re-run layout+OCR with fallback" logic
+that follows from our Stage 1 and 2 decisions.
+
+One genuine leftover I did find: a couple of cells still had some version of "not yet
+built" or "not yet decided" sitting in them from earlier in this conversation, back when
+we were deliberately leaving the embedding model, LLM, and rerank open while we worked
+through the rest of the sections first. Now that all three are actually decided, that
+hedge language is stale and should come out — there's no reason for the form to still
+read as uncertain about things you've since firmly decided. Every other cell across both
+sections already states a real, committed choice with its reasoning, so this is really
+just catching up the last few cells to match the standard the rest of the section is
+already holding.
+
+[USER]
+Good catch — I'll remove those "not yet decided" placeholders now. But I'm still a bit
+uneasy about the chunking part — our team declared semantic chunking as our bonus
+feature, and I want to make sure the chunking strategy we described in Section 6 (Stage 4)
+is actually consistent with that. Can we go deeper into chunking? I want to understand
+exactly how our rule-based chunking for plays and poems works, and how the semantic
+chunking for biography is different, and why we made that split.
+
+[AI]
+That's a great question to dig into — and it's exactly the kind of depth that will make
+your form stronger. Let me break it down.
+
+Your corpus has three distinct content types, and they demand different chunking
+strategies:
+
+**1. Plays (Comedy, History, Tragedy) — Rule-based structural chunking.**
+
+Plays are heavily structured: they have Act headings, Scene headings, and speaker
+prefixes (e.g., "Ham.", "Pol.", "King."). These are explicit markers of semantic
+boundaries. A natural chunk is a sequence of speeches within the same scene, packed to a
+target size (around 200 words) but never splitting a speech in half or crossing a scene
+boundary. The algorithm works like this:
+- First, you concatenate all pages of a play into a continuous text stream.
+- You detect act and scene headers using regex patterns.
+- You build a vocabulary of speaker names (by frequency, to filter out noise like
+  "Elsinore." which might be mistaken for a speaker).
+- You scan through the text, collecting speeches (speaker: text) until you reach the
+  target word count or hit a scene change, then you flush that group as one chunk.
+- The chunk carries metadata: title, act, scene, page range, speakers.
+
+This is semantic chunking in the sense that it respects discourse units — each chunk is a
+coherent block of dialogue within a single scene. It's rule-based because the structure
+is already printed on the page, so you don't need a learned model to find the boundaries.
+
+**2. Sonnets and Poems — 1:1 or stanza-based chunking.**
+
+Sonnets are 14-line poems, and each sonnet is a complete unit. So chunking is trivial:
+one sonnet per chunk. For longer narrative poems (like "Venus and Adonis"), they have
+stanza breaks, so you chunk by stanzas, again packed to target size if needed.
+
+**3. Biography — Semantic similarity chunking.**
+
+The biography is continuous prose with no speaker tags or act/scene markers. Here, we use
+an embedding-based similarity drop method:
+- Split the text into sentences.
+- Embed each sentence using BGE-M3.
+- Compute cosine similarity between adjacent sentences.
+- Where the similarity drops sharply (below a percentile threshold, say the 10th
+  percentile of all pairwise similarities for that document), cut.
+- Group sentences between cuts into chunks, again enforcing minimum and target word
+  counts.
+
+This is true "semantic chunking" in the modern RAG sense — boundaries are determined by
+topic shifts, not by explicit formatting. The cost is that it requires embedding
+inference during chunking (which is fine, since BGE-M3 is small and fast), and it's less
+deterministic than rule-based, but it's the only way to get coherent chunks from
+unstructured prose.
+
+The reason we split the strategies is pragmatic: for plays, the structure is free and
+reliable, so using it is fast, deterministic, and gives perfect citations. For biography,
+there is no structure to lean on, so we use the more expensive but necessary semantic
+method. That makes our chunking hybrid, which is actually a stronger design than a
+one-size-fits-all approach.
+
+[USER]
+That makes sense. I'm also curious about the embedding step — we chose BGE-M3, but you
+mentioned earlier that it supports dense and sparse. How does that work in practice for
+our corpus? And does it affect the index size or retrieval speed?
+
+[AI]
+Good questions. Let me give you the practical details.
+
+BGE-M3 produces a 1024-dimensional dense vector for each chunk. That dense vector is what
+we store in the FAISS index. The sparse representation is used only during reranking, not
+during the initial index building. Here's how that plays out:
+
+- During indexing, we only generate the dense embeddings and store them in the flat
+  index. The index size for ~4,800 chunks × 1024 floats × 4 bytes/float = about 20 MB,
+  plus a few MB for the chunk IDs and metadata. Tiny.
+
+- During retrieval, the query is also embedded into a 1024-dim dense vector, and we do a
+  brute-force inner product search against all stored vectors. This is fast — under 10ms
+  on a CPU, and even faster on GPU.
+
+- For reranking, we take the top, say, 20 candidates from the dense search. For each
+  candidate, we compute a sparse vector (using BGE-M3's sparse encoder) and combine it
+  with the dense score via a weighted sum (or max pooling). This adds a small overhead
+  per query (since we only compute sparse vectors for the top candidates, not the whole
+  corpus), but it often improves the rank of the true relevant chunk.
+
+- The sparse component is essentially a learned bag-of-words: it captures exact term
+  matches (like "honour" or "Falstaff") that might be diluted in the dense representation.
+  For a literary corpus with many archaic terms, this can be quite helpful.
+
+So the index itself is purely dense, and reranking uses the sparse as a post-hoc
+refinement. This gives us the best of both worlds: fast retrieval via dense, and a
+term-aware second pass to correct any ranking errors.
+
+[USER]
+That's clear — so the index is dense-only, and reranking is a lightweight addition.
+Now, about the agent loop — you mentioned earlier that we should have evidence-gated
+re-search. Can you elaborate on that? How does the agent decide when to widen the search,
+and when to stop and abstain?
+
+[AI]
+Yes, this is a critical part of making the agent robust. The idea is that the initial
+retrieval might not always return a highly relevant chunk, especially for ambiguous or
+broad questions. The agent should have a policy to widen its search when the evidence is
+weak, but not endlessly.
+
+Here's the concrete design we've committed to:
+
+- The agent first calls retrieve with k = 5 (or some small number) and gets the top
+  chunks and their similarity scores.
+- It checks the top score against a threshold, say 0.35 (this is configurable). If the
+  score is above the threshold, it proceeds with extraction and citation.
+- If the score is below the threshold, the agent considers the evidence weak. It then
+  calls retrieve again with k = 10, then k = 20 (each widening step increases k by a
+  factor, or a fixed step). This allows the agent to cast a wider net.
+- After three widening attempts (k = 5 → 10 → 20), if the top score is still below the
+  threshold, the agent stops and calls escalate_to_human, or returns a polite "I couldn't
+  find a relevant passage" response.
+
+This is evidence-gated because the agent only widens when the evidence (score) is weak,
+and it abstains when it has exhausted its search budget without finding anything
+confident. This prevents the agent from hallucinating an answer when there is no support
+in the corpus.
+
+This design is directly tied to your NFR: robust/reliable. It ensures the agent doesn't
+just guess; it only answers when it has high-confidence evidence, and it admits failure
+gracefully.
+
+[USER]
+That's reassuring. I'm also thinking about the evaluation set — we said ~30-50 items, but
+I want to make sure we cover all categories. How should we distribute them across the
+types of works?
+
+[AI]
+A balanced distribution would be something like:
+
+- **Comedies (e.g., Much Ado, Twelfth Night)**: 6-8 questions
+- **Histories (e.g., Henry IV, Henry V)**: 6-8 questions
+- **Tragedies (e.g., Hamlet, Macbeth, King Lear)**: 8-10 questions
+- **Sonnets**: 3-5 questions
+- **Other poems (Venus and Adonis, etc.)**: 2-3 questions
+- **Biography**: 3-5 questions
+- **Out-of-corpus (abstain)**: 5 questions
+
+That gives a total of roughly 35-45 items. The rationale is that the plays are the bulk
+of the corpus (37 plays vs 1 sonnet collection and a few poems), so they get more
+coverage. But the smaller sections still get enough questions to catch any
+category-specific issues.
+
+Also, for the verifiable questions (exact quote lookups), we should pick famous quotes
+that are unambiguous (e.g., "To be, or not to be", "All the world's a stage", "Shall I
+compare thee..."). For judged questions, we can ask about character motivations or
+themes, and have a human/LLM judge evaluate the answer's quality and citation.
+
+[USER]
+That's a solid plan. One more thing — we have a `build_index.sh` script that calls
+`run_ingest.py`. I noticed the script comment says it previously ran `make ingest index`
+which duplicated the work. Can you explain what the fix was and why it matters?
+
+[AI]
+Good catch. The original `build_index.sh` in the starter code ran:
+make ingest index That calls both the ingest and index Makefile targets. But in our codebase, the
+index target itself calls scripts/run_index.py, which internally calls
+pipeline.build_knowledge_base(cfg). That same function is also called by
+scripts/run_ingest.py. So running both targets essentially builds the entire index
+twice — first during ingest, then again during index. That's a waste of compute
+time, especially on a Kaggle session where time is limited.
+
+The fix was to change the script to only call python scripts/run_ingest.py once,
+because that single call already handles loading, chunking, embedding, and indexing in
+one pass. This roughly halves the runtime of the build step, which is important given
+Kaggle's session limits (12 hours max, and we have a large corpus).
+
+I've updated the script with a comment explaining this, so it's clear why we made the
+change and that it's not a bug.
+
+[USER]
+Great. That's the kind of practical detail that might come up in a viva. I think we've
+covered everything now. Let me just quickly summarise what I've written for Section 6 and
+7, and you can tell me if I'm missing anything.
+
+For Section 6, I have:
+
+Stage 0: N/A (framing)
+
+Stage 1: PyMuPDF for ingest; enhance not needed (scans clean)
+
+Stage 2: hand-written column splitter (reorder_two_column), PP-Structure as fallback
+
+Stage 3: Tesseract with column-reordering, PaddleOCR/Unlimited-OCR as fallbacks
+
+Stage 4: semantic chunking (rule-based for plays/poems, BGE-M3 similarity for
+biography), BGE-M3 embedding, FAISS flat index
+
+Stage 5: FAISS similarity search, rerank via BGE-M3 dense+sparse
+
+Stage 6: Qwen3-8B agent (4-bit quantized)
+
+Stage 7: RLVR bonus (optional)
+
+Stage 8: FastAPI backend, React frontend
+
+Stage 9: evaluation set ~30-50 items, groundedness accuracy
+
+For Section 7, I have:
+
+7.1: Brain = Qwen3-8B + Tesseract + BGE-M3; loop = perceive → retrieve → rerank →
+extract → cite → stop
+
+7.2: Tools defined (retrieve, rerank, read_page, enhance_page, extract, aggregate,
+cite, calculator, escalate_to_human), each with Read/Act status
+
+7.3: act-then-log autonomy, escalate_to_human for unsure cases, max_steps=8, $0 budget
+
+7.4: eval set split into verifiable/judged/abstain, RLVR bonus
+
+7.5: risks (wrong tool, runaway loop, hallucination) with mitigations
+
+Does that cover everything?
+
+[AI]
+Yes, that's complete. You've articulated every cell with clear reasoning, and you've
+connected decisions across stages (e.g., the embedding model choice affecting reranking,
+the chunking strategy tied to the corpus structure). The summary is accurate and
+well-organized.
+
+The only thing I'd double-check is that in Section 6, Stage 4, you explicitly mention
+"semantic chunking" as the method, and you've distinguished between rule-based for plays
+and similarity-based for biography. That's important because the form asks for the
+method, not just the tool. You've got that covered.
+
+Also, in Section 7.2, you've correctly marked enhance_page as "Acts" (because it
+re-runs the pipeline and could produce a different output), and cite as "Acts" (because
+it attaches a citation). The rest are "Reads."
+
+Everything else aligns. You're good to go.
+
+[USER]
+Perfect. Thanks for walking through all of this with me — I actually understand the
+pipeline and agent design now, not just the words to fill in the form.
+
+REFLECTION
+==================================================================
+
+I was assigned Sections 6 and 7, and I deliberately chose to understand the entire
+pipeline before filling a single cell. I didn't want to just copy boilerplate or guess
+what a "stage" meant — I wanted to be able to defend every choice.
+
+The process I followed was consistent: I asked for the general concept first, then
+brought in our specific corpus evidence, and only then decided. This approach helped me
+make informed decisions on every stage. I pushed back on suggestions that didn't fit our
+project, and I insisted on reasoning through the design of the agent and its tools myself.
+
+Key moments where I did the reasoning myself:
+
+realised that enhance stage didn't apply to us because our scans are clean, and
+scoped that claim honestly to the pages I'd inspected.
+
+argued for keeping our hand-written column splitter because we had real CER evidence
+(77% → 4%) that justified it.
+
+designed the enhance_page tool as a re-run with fallback parameters, not a separate
+image-enhancement model, because the real failure mode is layout, not image quality.
+
+chose BGE-M3 after understanding its long-context advantage for our semantic chunks.
+
+insisted on the VRAM arithmetic for Qwen3-8B to avoid an unsupported "fits on
+Kaggle" claim, and wrote "sized to run" instead of "confirmed to fit".
+
+settled the rerank question by choosing BGE-M3's dense+sparse scoring over a separate
+cross-encoder, balancing simplicity and effectiveness.
+
+also made sure the chunking strategy was correctly described as hybrid, with rule-based
+for plays and similarity-based for biography, matching our declared bonus feature.
+Finally, did a consistency sweep to catch any contradictions or stale "not yet decided"
+language.
