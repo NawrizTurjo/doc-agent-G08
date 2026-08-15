@@ -20,8 +20,8 @@ def build(chunks: list[Chunk], vectors, cfg: dict) -> None:
     inner-product search) over L2-normalized embeddings -- A1's committed choice, not the
     starter template's faiss:hnsw placeholder: at ~4,800 vectors x 1024 dims the index is a
     few tens of MB and searches in low-ms on CPU, so there's no recall/latency pressure that
-    would justify HNSW's approximate trade-off at this scale (see
-    codes/ECI/embed_chunk_index_plan.md S5)."""
+    would justify HNSW's approximate trade-off at this scale -- see the A2 form, Section 3's
+    Vector index row."""
     import faiss
 
     index_type = cfg["index"].get("type", "faiss:flat")

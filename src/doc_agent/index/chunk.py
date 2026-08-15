@@ -1,10 +1,9 @@
 """Stage 4 — chunk text (hybrid: rule-based for Plays/Sonnets/Poems, embedding-similarity
-semantic chunking for the Biography prose). Ported from the validated Kaggle notebook
-codes/chunk_embed_index_shakespeare.ipynb -- see codes/ECI/chunking_strategy_plan.md and
-codes/ECI/embed_chunk_index_plan.md for the design rationale this file implements. Chunking
-logic itself (regexes, packing, similarity-cut math) is unchanged from that validated
-notebook; only the I/O (file reads -> in-memory dict lookups) and the final Chunk-contract
-assembly are adapted to this repo's fixed pipeline shape."""
+semantic chunking for the Biography prose). Ported from a validated Kaggle prototype
+notebook where this same chunking logic (regexes, packing, similarity-cut math) was
+developed and cross-checked against two independent full-corpus runs; only the I/O (file
+reads -> in-memory dict lookups) and the final Chunk-contract assembly are adapted to this
+repo's fixed pipeline shape."""
 from __future__ import annotations
 import re
 from collections import Counter, defaultdict
@@ -258,8 +257,8 @@ def similarity_cuts(embeddings: np.ndarray, percentile: float) -> list[int]:
     """Indices i such that a cut boundary falls AFTER sentence i. Assumes L2-normalized
     embeddings (dot product == cosine similarity). Threshold is the (100-percentile)th
     percentile of adjacent dissimilarity, computed for THIS document's embeddings only --
-    never a fixed global cutoff (chunking_strategy_plan.md S8: 'relative, not a fixed
-    threshold')."""
+    never a fixed global cutoff (a deliberate design decision: relative, not a fixed
+    threshold)."""
     n = len(embeddings)
     if n < 2:
         return []
@@ -297,7 +296,8 @@ def enforce_min_words(segments: list[list[int]], word_of, min_words: int) -> lis
     """Same trailing-buffer behavior as pack() above: a leftover buffer under min_words still
     becomes its own final chunk rather than being merged backward -- simpler and more
     predictable than silently growing the previous chunk, and it's what produces the small
-    documented rate of under-min chunks (~1.8%, chunking_strategy_plan.md S9)."""
+    documented rate of under-min chunks (~1.8%, confirmed on the full-corpus run -- see the
+    A2 form, Section 3)."""
     merged, pending = [], []
     for seg in segments:
         pending = pending + seg
@@ -374,14 +374,14 @@ def split(chunks: list[Chunk], cfg: dict) -> list[Chunk]:
     """Re-chunk to cfg['index'] size/overlap.
 
     `chunks` here is the PAGE-granularity output of vision/ocr.transcribe (one Chunk per
-    page). This stage re-groups those by work (doc_id) and re-chunks using the hybrid
-    method validated in codes/chunk_embed_index_shakespeare.ipynb: rule-based structural
+    page). This stage re-groups those by work (doc_id) and re-chunks using a hybrid method,
+    validated in a prototype notebook before being ported here: rule-based structural
     chunking (ACT/SCENE headers, speaker vocabulary, sonnet numerals) for Plays/Sonnets/
     Poems, packed to ~cfg['index']['chunk_target_words'] words/chunk; embedding-similarity
     cuts for the 2 continuous-prose Biography works. Fixed-size token windows (the starter
     template's original cfg['index']['chunk_tokens']/['overlap'] placeholder) were rejected
-    -- see codes/ECI/chunking_strategy_plan.md -- because they'd split mid-speech/mid-scene
-    and throw away the free structural metadata this corpus already prints.
+    because they'd split mid-speech/mid-scene and throw away the free structural metadata
+    this corpus already prints -- see the A2 form, Section 3.
     """
     idx_cfg = cfg["index"]
     target = idx_cfg.get("chunk_target_words", 200)

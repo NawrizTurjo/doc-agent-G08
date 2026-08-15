@@ -39,8 +39,8 @@ def embed_texts(texts: list[str], embed_cfg: dict) -> np.ndarray:
     """Low-level helper shared by index/chunk.py's Biography similarity-cut chunker and
     encode() below -- both need the same L2-normalized BGE-M3 embeddings, just at different
     granularities (sentences during chunking vs. final chunks during indexing). This mirrors
-    the validated notebook's structure (codes/chunk_embed_index_shakespeare.ipynb Part 4 is
-    shared by Part 3's bio-chunker and Part 8's corpus-wide embedding pass)."""
+    the same shared-embedder structure used in the validated prototype notebook this stage
+    was ported from."""
     if not texts:
         return np.zeros((0, embed_cfg.get("dim", 1024)), dtype=np.float32)
     model = _get_embedder(embed_cfg)
@@ -52,7 +52,7 @@ def embed_texts(texts: list[str], embed_cfg: dict) -> np.ndarray:
 def encode(chunks: list[Chunk], cfg: dict):
     """Embed with cfg['embed']['model']. Embeds the citation-header-prefixed Chunk.text
     (already baked in by index/chunk.py's split()) rather than bare dialogue, so act/scene/
-    speaker tokens help retrieval too -- see codes/ECI/embed_chunk_index_plan.md S4."""
+    speaker tokens help retrieval too -- see the A2 form, Section 4's Embed row."""
     embed_cfg = cfg["embed"]
     texts = [c.text for c in chunks]
     t0 = time.time()
