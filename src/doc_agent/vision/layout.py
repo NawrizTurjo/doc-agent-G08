@@ -10,7 +10,7 @@ log = get_logger(__name__)
 # continuous prose (Biography) and the standalone poems/sonnets. Everything else (Comedy/
 # History/Tragedy) is the justified two-column dramatic-dialogue layout that the whole A1
 # 'data speciality' choice is built around. toc.json carries no per-page layout_type field
-# (see the data-schema note in codes/A2_form.md Section 3) so this is a CATEGORY-LEVEL RULE,
+# (see the data-schema note in A2_form.md Section 3) so this is a CATEGORY-LEVEL RULE,
 # not a real per-page detection -- flagged here for whoever owns Layout/OCR to confirm
 # against the actual scans, especially for the Poems (verified for Biography vs. plays in
 # A1; not independently re-verified per-page for every poem in this edition).
